@@ -38,7 +38,7 @@ if (seedAssignments.length === 0) {
   }
 }
 
-// 3/5の取り消し済みデータを削除（一時的なクリーンアップ）
+// 3/5の取り消し済みデータを削除（一時的なクリーンアップ・再デプロイ用）
 try {
   const allAssignments = getAssignments();
   for (const a of allAssignments) {
