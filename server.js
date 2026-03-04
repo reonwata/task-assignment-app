@@ -5,7 +5,7 @@
 
 const express = require('express');
 const path = require('path');
-const { initializeDatabase, getMembers, getMemberById, addMember, deleteMember, updateTaskCount, resetAllCounts, saveAssignment, getAssignments, cancelAssignment } = require('./db');
+const { initializeDatabase, getMembers, getMemberById, addMember, deleteMember, updateTaskCount, resetAllCounts, saveAssignment, getAssignments, cancelAssignment, deleteAssignment } = require('./db');
 const { assignTasks } = require('./assign');
 
 const app = express();
@@ -165,6 +165,26 @@ app.get('/api/assignments', (req, res) => {
     const assignments = getAssignments();
     res.json({ assignments });
   } catch (err) {
+    res.status(500).json({ error: '内部サーバーエラーが発生しました' });
+  }
+});
+
+// DELETE /api/assignments/:id — 取り消し済み割り当て削除
+app.delete('/api/assignments/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: '無効な割り当てIDです' });
+    }
+    deleteAssignment(id);
+    res.json({ success: true });
+  } catch (err) {
+    if (err.message === '割り当てが見つかりません') {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err.message === '取り消し済みの割り当てのみ削除できます') {
+      return res.status(400).json({ error: err.message });
+    }
     res.status(500).json({ error: '内部サーバーエラーが発生しました' });
   }
 });
