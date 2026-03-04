@@ -38,6 +38,19 @@ if (seedAssignments.length === 0) {
   }
 }
 
+// 3/5の取り消し済みデータを削除（一時的なクリーンアップ）
+try {
+  const allAssignments = getAssignments();
+  for (const a of allAssignments) {
+    if (a.date === '2026-03-05' && a.cancelled) {
+      deleteAssignment(a.id);
+      console.log('3/5の取り消し済みデータを削除しました (ID: ' + a.id + ')');
+    }
+  }
+} catch (err) {
+  console.log('クリーンアップスキップ:', err.message);
+}
+
 // --- APIエンドポイント ---
 
 // GET /api/members — メンバー一覧取得
