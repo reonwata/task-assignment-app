@@ -9,7 +9,7 @@ const { initializeDatabase, getMembers, getMemberById, addMember, deleteMember, 
 const { assignTasks } = require('./assign');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // ミドルウェア
 app.use(express.json());
