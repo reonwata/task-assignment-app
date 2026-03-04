@@ -106,9 +106,10 @@ app.post('/api/assign', (req, res) => {
     // 割り当て実行
     const result = assignTasks(members);
 
-    // 今日の日付（YYYY-MM-DD形式）
-    const today = new Date();
-    const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    // 今日の日付（YYYY-MM-DD形式、日本時間）
+    const now = new Date();
+    const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const date = `${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, '0')}-${String(jst.getUTCDate()).padStart(2, '0')}`;
 
     // DB保存（累積回数更新 + 履歴保存）
     const assignment = saveAssignment(date, result);
