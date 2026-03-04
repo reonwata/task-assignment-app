@@ -18,6 +18,26 @@ app.use(express.static(path.join(__dirname, 'public')));
 // データベース初期化
 initializeDatabase();
 
+// 初期データ投入（履歴が空の場合のみ）
+const seedAssignments = getAssignments();
+if (seedAssignments.length === 0) {
+  try {
+    saveAssignment('2026-03-03', {
+      task1: ['uekeisu', 'kitetsu', 'sakagyun', 'yamshoic', 'yamkohe', 'yuukaigt'],
+      task2: ['koniryo', 'riikaa', 'nyunn', 'ryoanz', 'curakawa'],
+      leader_other: ['isswada', 'yonghyun', 'cseungj', 'wyamash', 'ayakura']
+    });
+    saveAssignment('2026-03-04', {
+      task1: ['sawmadok', 'daikikk', 'sagawa', 'yosmi', 'reonwata'],
+      task2: ['koniryo', 'riikaa', 'nyunn', 'yamshoic', 'kitetsu'],
+      leader_other: ['yonghyun', 'cseungj', 'wyamash', 'yamkohe', 'isswada']
+    });
+    console.log('初期データ（3/3, 3/4）を投入しました');
+  } catch (err) {
+    console.log('初期データ投入スキップ:', err.message);
+  }
+}
+
 // --- APIエンドポイント ---
 
 // GET /api/members — メンバー一覧取得
