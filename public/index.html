@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>タスク割り当てアプリ</title>
+  <title>タスク割り当てツール</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', 'Hiragino Sans', sans-serif; background: #f5f7fa; color: #333; padding: 20px; max-width: 960px; margin: 0 auto; }
@@ -56,12 +56,29 @@
     .history-date { font-weight: 600; font-size: 0.9rem; }
     .history-details { font-size: 0.85rem; line-height: 1.6; }
     .cancelled-badge { background: #e74c3c; color: #fff; font-size: 0.75rem; padding: 2px 6px; border-radius: 3px; }
+
+    /* 折りたたみ */
+    details summary { list-style: none; }
+    details summary::-webkit-details-marker { display: none; }
+    details summary .toggle-arrow { display: inline-block; transition: transform 0.2s; }
+    details[open] summary .toggle-arrow { transform: rotate(90deg); }
   </style>
 </head>
 <body>
-  <h1>タスク割り当てアプリ</h1>
+  <h1>タスク割り当てツール</h1>
 
   <div id="notification"></div>
+
+  <!-- 使い方ガイド -->
+  <section>
+    <div style="background:#eaf4fc;border-radius:6px;padding:12px 16px;font-size:0.85rem;line-height:1.7;color:#2c3e50;">
+      📋 <span style="font-weight:600;">使い方（毎日代表者1名が行ってください）</span><br>
+      ① 下の「出勤メンバー選択」で、本日出勤しているメンバーにチェックを入れる<br>
+      ② 「割り当て実行」ボタンを押す（※タスク回数は均等になるように割り振られます）<br>
+      ③ 割り当て結果が表示されたら「コピー」ボタンを押す<br>
+      ④ Slackのチャンネルに貼り付けて共有する
+    </div>
+  </section>
 
   <!-- セクション1: 出勤メンバー選択エリア -->
   <section>
@@ -85,32 +102,32 @@
     <button class="btn-primary btn-small" onclick="copyResult()" style="margin-top:8px;">コピー</button>
   </section>
 
-  <!-- セクション4: 累積タスク回数一覧 -->
+  <!-- セクション4: 累積タスク回数（別ページへのリンク） -->
   <section>
     <h2>累積タスク回数</h2>
-    <table class="counts-table">
-      <thead>
-        <tr><th>メンバー</th><th>タスク1</th><th>タスク2</th><th>Leader&amp;Other</th></tr>
-      </thead>
-      <tbody id="counts-body"></tbody>
-    </table>
-    <button class="btn-warning btn-small" onclick="resetCounts()" style="margin-top:10px;">全リセット</button>
+    <a href="/counts.html" class="btn-primary" style="display:inline-block;text-decoration:none;padding:8px 16px;">累積タスク回数を表示・編集</a>
   </section>
 
   <!-- セクション5: メンバー管理エリア -->
   <section>
-    <h2>メンバー管理</h2>
-    <div class="add-member-form">
-      <input type="text" id="new-alias" placeholder="エイリアス名を入力">
-      <button class="btn-success" onclick="addMember()">追加</button>
-    </div>
-    <div id="member-manage-list" class="member-list-manage"></div>
+    <details>
+      <summary style="cursor:pointer;font-size:1.1rem;font-weight:600;color:#34495e;padding:4px 0;"><span class="toggle-arrow">▶</span> メンバー管理</summary>
+      <div style="margin-top:12px;">
+        <div class="add-member-form">
+          <input type="text" id="new-alias" placeholder="エイリアス名を入力">
+          <button class="btn-success" onclick="addMember()">追加</button>
+        </div>
+        <div id="member-manage-list" class="member-list-manage"></div>
+      </div>
+    </details>
   </section>
 
   <!-- セクション6: 割り当て履歴エリア -->
   <section>
-    <h2>割り当て履歴</h2>
-    <div id="history-list"></div>
+    <details>
+      <summary style="cursor:pointer;font-size:1.1rem;font-weight:600;color:#34495e;padding:4px 0;">▶ 割り当て履歴</summary>
+      <div style="margin-top:12px;" id="history-list"></div>
+    </details>
   </section>
 
   <script>
@@ -146,7 +163,6 @@
         const data = await apiFetch('/api/members');
         members = data.members;
         renderCheckboxes();
-        renderCountsTable();
         renderMemberManageList();
       } catch (err) {
         showNotification('メンバー一覧の取得に失敗しました: ' + err.message, 'error');

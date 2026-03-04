@@ -276,6 +276,26 @@ function cancelAssignment(id) {
   cancelTransaction();
 }
 
+/**
+ * 割り当て履歴を削除する（取り消し済みのみ削除可能）
+ * @param {number} id - 割り当てID
+ */
+function deleteAssignment(id) {
+  const deleteTransaction = db.transaction(() => {
+    const assignment = db.prepare('SELECT id, cancelled FROM assignments WHERE id = ?').get(id);
+    if (!assignment) {
+      throw new Error('割り当てが見つかりません');
+    }
+    if (assignment.cancelled !== 1) {
+      throw new Error('取り消し済みの割り当てのみ削除できます');
+    }
+    db.prepare('DELETE FROM assignment_details WHERE assignment_id = ?').run(id);
+    db.prepare('DELETE FROM assignments WHERE id = ?').run(id);
+  });
+
+  deleteTransaction();
+}
+
 module.exports = {
   initializeDatabase,
   getDb,
@@ -289,5 +309,6 @@ module.exports = {
   resetAllCounts,
   saveAssignment,
   getAssignments,
-  cancelAssignment
+  cancelAssignment,
+  deleteAssignment
 };
