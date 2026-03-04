@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>タスク割り当てアプリ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', 'Hiragino Sans', sans-serif; background: #f5f7fa; color: #333; padding: 20px; max-width: 960px; margin: 0 auto; }
+    h1 { text-align: center; margin-bottom: 24px; color: #2c3e50; }
+    h2 { font-size: 1.1rem; margin-bottom: 12px; color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 4px; }
+    section { background: #fff; border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    button { cursor: pointer; border: none; border-radius: 4px; padding: 6px 14px; font-size: 0.9rem; transition: opacity 0.2s; }
+    button:hover { opacity: 0.85; }
+    .btn-primary { background: #3498db; color: #fff; }
+    .btn-success { background: #2ecc71; color: #fff; }
+    .btn-danger { background: #e74c3c; color: #fff; }
+    .btn-secondary { background: #95a5a6; color: #fff; }
+    .btn-warning { background: #f39c12; color: #fff; }
+    .btn-small { padding: 3px 8px; font-size: 0.8rem; }
+
+    /* 通知 */
+    #notification { position: fixed; top: 16px; right: 16px; padding: 12px 20px; border-radius: 6px; color: #fff; font-size: 0.9rem; z-index: 1000; display: none; max-width: 360px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    #notification.success { background: #2ecc71; display: block; }
+    #notification.error { background: #e74c3c; display: block; }
+
+    /* 出勤メンバー選択 */
+    .member-checkboxes { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 10px 0; }
+    .member-checkboxes label { font-size: 0.9rem; white-space: nowrap; }
+    .select-buttons { display: flex; gap: 8px; margin-bottom: 8px; }
+
+    /* 割り当て実行 */
+    #assign-btn { font-size: 1rem; padding: 10px 28px; margin: 8px 0; }
+
+    /* 割り当て結果 */
+    #result-area { white-space: pre-wrap; background: #ecf0f1; padding: 12px; border-radius: 4px; min-height: 40px; font-size: 0.9rem; margin-bottom: 8px; }
+    #result-area:empty::before { content: '割り当て結果がここに表示されます'; color: #999; }
+
+    /* 累積回数テーブル */
+    .counts-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .counts-table th, .counts-table td { border: 1px solid #ddd; padding: 6px 8px; text-align: center; }
+    .counts-table th { background: #3498db; color: #fff; }
+    .counts-table td:first-child { text-align: left; font-weight: 600; }
+    .counts-table input[type="number"] { width: 60px; text-align: center; border: 1px solid #ccc; border-radius: 3px; padding: 2px 4px; }
+
+    /* メンバー管理 */
+    .add-member-form { display: flex; gap: 8px; margin-bottom: 12px; }
+    .add-member-form input { flex: 1; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+    .member-list-manage { display: flex; flex-wrap: wrap; gap: 6px; }
+    .member-tag { display: inline-flex; align-items: center; gap: 4px; background: #ecf0f1; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; }
+
+    /* 履歴 */
+    .history-item { border: 1px solid #ddd; border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; }
+    .history-item.cancelled { opacity: 0.5; }
+    .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .history-date { font-weight: 600; font-size: 0.9rem; }
+    .history-details { font-size: 0.85rem; line-height: 1.6; }
+    .cancelled-badge { background: #e74c3c; color: #fff; font-size: 0.75rem; padding: 2px 6px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1>タスク割り当てアプリ</h1>
+
+  <div id="notification"></div>
+
+  <!-- セクション1: 出勤メンバー選択エリア -->
+  <section>
+    <h2>出勤メンバー選択</h2>
+    <div class="select-buttons">
+      <button class="btn-primary btn-small" onclick="selectAll()">全員選択</button>
+      <button class="btn-secondary btn-small" onclick="deselectAll()">全員解除</button>
+    </div>
+    <div id="member-checkboxes" class="member-checkboxes"></div>
+  </section>
+
+  <!-- セクション2: 割り当て実行ボタン -->
+  <section>
+    <button id="assign-btn" class="btn-success" onclick="executeAssign()">割り当て実行</button>
+  </section>
+
+  <!-- セクション3: 割り当て結果表示エリア -->
+  <section>
+    <h2>割り当て結果</h2>
+    <div id="result-area"></div>
+    <button class="btn-primary btn-small" onclick="copyResult()" style="margin-top:8px;">コピー</button>
+  </section>
+
+  <!-- セクション4: 累積タスク回数一覧 -->
+  <section>
+    <h2>累積タスク回数</h2>
+    <table class="counts-table">
+      <thead>
+        <tr><th>メンバー</th><th>タスク1</th><th>タスク2</th><th>Leader&amp;Other</th></tr>
+      </thead>
+      <tbody id="counts-body"></tbody>
+    </table>
+    <button class="btn-warning btn-small" onclick="resetCounts()" style="margin-top:10px;">全リセット</button>
+  </section>
+
+  <!-- セクション5: メンバー管理エリア -->
+  <section>
+    <h2>メンバー管理</h2>
+    <div class="add-member-form">
+      <input type="text" id="new-alias" placeholder="エイリアス名を入力">
+      <button class="btn-success" onclick="addMember()">追加</button>
+    </div>
+    <div id="member-manage-list" class="member-list-manage"></div>
+  </section>
+
+  <!-- セクション6: 割り当て履歴エリア -->
+  <section>
+    <h2>割り当て履歴</h2>
+    <div id="history-list"></div>
+  </section>
+
+  <script>
+    // --- 状態管理 ---
+    let members = [];
+    let lastAssignment = null; // { date, task1, task2, leader_other }
+
+    // --- 通知 ---
+    function showNotification(message, type) {
+      const el = document.getElementById('notification');
+      el.textContent = message;
+      el.className = type; // 'success' or 'error'
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => { el.className = ''; el.style.display = 'none'; }, 3000);
+    }
+
+    // --- API通信ヘルパー ---
+    async function apiFetch(url, options = {}) {
+      const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' },
+        ...options
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'エラーが発生しました');
+      }
+      return data;
+    }
+
+    // --- メンバー一覧取得・表示 ---
+    async function loadMembers() {
+      try {
+        const data = await apiFetch('/api/members');
+        members = data.members;
+        renderCheckboxes();
+        renderCountsTable();
+        renderMemberManageList();
+      } catch (err) {
+        showNotification('メンバー一覧の取得に失敗しました: ' + err.message, 'error');
+      }
+    }
+
+    function renderCheckboxes() {
+      const container = document.getElementById('member-checkboxes');
+      container.innerHTML = members.map(m =>
+        '<label><input type="checkbox" value="' + m.id + '" checked> ' + escapeHtml(m.alias) + '</label>'
+      ).join('');
+    }
+
+    function renderCountsTable() {
+      const tbody = document.getElementById('counts-body');
+      tbody.innerHTML = members.map(m =>
+        '<tr>' +
+          '<td>' + escapeHtml(m.alias) + '</td>' +
+          '<td><input type="number" min="0" value="' + m.task1_count + '" data-id="' + m.id + '" data-task="task1" onchange="updateCount(this)" onblur="updateCount(this)"></td>' +
+          '<td><input type="number" min="0" value="' + m.task2_count + '" data-id="' + m.id + '" data-task="task2" onchange="updateCount(this)" onblur="updateCount(this)"></td>' +
+          '<td><input type="number" min="0" value="' + m.leader_other_count + '" data-id="' + m.id + '" data-task="leader_other" onchange="updateCount(this)" onblur="updateCount(this)"></td>' +
+        '</tr>'
+      ).join('');
+    }
+
+    function renderMemberManageList() {
+      const container = document.getElementById('member-manage-list');
+      container.innerHTML = members.map(m =>
+        '<span class="member-tag">' + escapeHtml(m.alias) +
+        ' <button class="btn-danger btn-small" onclick="deleteMember(' + m.id + ')">×</button></span>'
+      ).join('');
+    }
+
+    // --- 全員選択 / 全員解除 ---
+    function selectAll() {
+      document.querySelectorAll('#member-checkboxes input[type="checkbox"]').forEach(cb => cb.checked = true);
+    }
+
+    function deselectAll() {
+      document.querySelectorAll('#member-checkboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
+    }
+
+    // --- 割り当て実行 ---
+    async function executeAssign() {
+      try {
+        const checked = document.querySelectorAll('#member-checkboxes input[type="checkbox"]:checked');
+        const memberIds = Array.from(checked).map(cb => Number(cb.value));
+        if (memberIds.length === 0) {
+          showNotification('出勤メンバーを1名以上選択してください', 'error');
+          return;
+        }
+        if (!confirm('選択した' + memberIds.length + '名で割り当てを実行しますか？')) return;
+        const data = await apiFetch('/api/assign', {
+          method: 'POST',
+          body: JSON.stringify({ memberIds })
+        });
+        lastAssignment = data.assignment;
+        renderResult(data.assignment);
+        showNotification('割り当てが完了しました', 'success');
+        await loadMembers();
+        await loadHistory();
+      } catch (err) {
+        showNotification('割り当てに失敗しました: ' + err.message, 'error');
+      }
+    }
+
+    function atNames(names) { return names.map(function(n) { return '@' + n; }).join('、'); }
+
+    function renderResult(assignment) {
+      const area = document.getElementById('result-area');
+      const dateStr = formatDateSlash(assignment.date);
+      const lines = [
+        '■ 本日（' + dateStr + '）のタスク割り振り',
+        'タスク1：' + atNames(assignment.task1),
+        'タスク2：' + atNames(assignment.task2),
+        'Leader＆Other：' + atNames(assignment.leader_other)
+      ];
+      area.textContent = lines.join('\n');
+    }
+
+    // --- コピー ---
+    async function copyResult() {
+      if (!lastAssignment) {
+        showNotification('コピーする割り当て結果がありません', 'error');
+        return;
+      }
+      const dateStr = formatDateSlash(lastAssignment.date);
+      const text = '■ 本日（' + dateStr + '）のタスク割り振り\n' +
+        'タスク1：' + atNames(lastAssignment.task1) + '\n' +
+        'タスク2：' + atNames(lastAssignment.task2) + '\n' +
+        'Leader＆Other：' + atNames(lastAssignment.leader_other);
+      try {
+        await navigator.clipboard.writeText(text);
+        showNotification('クリップボードにコピーしました', 'success');
+      } catch (err) {
+        showNotification('コピーに失敗しました: ' + err.message, 'error');
+      }
+    }
+
+    // --- 累積回数の編集 ---
+    async function updateCount(input) {
+      const id = Number(input.dataset.id);
+      const task = input.dataset.task;
+      const count = parseInt(input.value, 10);
+      if (isNaN(count) || count < 0) {
+        showNotification('累積回数は0以上の整数を入力してください', 'error');
+        return;
+      }
+      if (!confirm('累積回数を ' + count + ' に変更しますか？')) {
+        await loadMembers();
+        return;
+      }
+      try {
+        await apiFetch('/api/members/' + id + '/counts', {
+          method: 'PUT',
+          body: JSON.stringify({ task, count })
+        });
+        showNotification('累積回数を更新しました', 'success');
+      } catch (err) {
+        showNotification('累積回数の更新に失敗しました: ' + err.message, 'error');
+      }
+    }
+
+    // --- リセット ---
+    async function resetCounts() {
+      if (!confirm('全メンバーの累積回数をリセットしますか？')) return;
+      try {
+        await apiFetch('/api/reset', { method: 'POST' });
+        showNotification('累積回数をリセットしました', 'success');
+        await loadMembers();
+      } catch (err) {
+        showNotification('リセットに失敗しました: ' + err.message, 'error');
+      }
+    }
+
+    // --- メンバー追加 ---
+    async function addMember() {
+      const input = document.getElementById('new-alias');
+      const alias = input.value.trim();
+      if (!alias) {
+        showNotification('エイリアス名を入力してください', 'error');
+        return;
+      }
+      try {
+        await apiFetch('/api/members', {
+          method: 'POST',
+          body: JSON.stringify({ alias })
+        });
+        input.value = '';
+        showNotification('メンバーを追加しました', 'success');
+        await loadMembers();
+      } catch (err) {
+        showNotification('メンバー追加に失敗しました: ' + err.message, 'error');
+      }
+    }
+
+    // --- メンバー削除 ---
+    async function deleteMember(id) {
+      if (!confirm('このメンバーを削除しますか？')) return;
+      try {
+        await apiFetch('/api/members/' + id, { method: 'DELETE' });
+        showNotification('メンバーを削除しました', 'success');
+        await loadMembers();
+      } catch (err) {
+        showNotification('メンバー削除に失敗しました: ' + err.message, 'error');
+      }
+    }
+
+    // --- 履歴表示 ---
+    async function loadHistory() {
+      try {
+        const data = await apiFetch('/api/assignments');
+        renderHistory(data.assignments);
+      } catch (err) {
+        showNotification('履歴の取得に失敗しました: ' + err.message, 'error');
+      }
+    }
+
+    function renderHistory(assignments) {
+      const container = document.getElementById('history-list');
+      if (assignments.length === 0) {
+        container.innerHTML = '<p style="color:#999;font-size:0.9rem;">履歴はありません</p>';
+        return;
+      }
+      container.innerHTML = assignments.map(a => {
+        const cancelled = a.cancelled;
+        const dateStr = formatDateSlash(a.date);
+        const task1 = a.details.filter(d => d.task === 'task1').map(d => d.alias).join('、');
+        const task2 = a.details.filter(d => d.task === 'task2').map(d => d.alias).join('、');
+        const leaderOther = a.details.filter(d => d.task === 'leader_other').map(d => d.alias).join('、');
+        return '<div class="history-item' + (cancelled ? ' cancelled' : '') + '">' +
+          '<div class="history-header">' +
+            '<span class="history-date">' + escapeHtml(dateStr) + (cancelled ? ' <span class="cancelled-badge">取り消し済み</span>' : '') + '</span>' +
+            '<button class="btn-danger btn-small" onclick="cancelAssignment(' + a.id + ')"' + (cancelled ? ' disabled' : '') + '>取り消し</button>' +
+          '</div>' +
+          '<div class="history-details">' +
+            'タスク1：' + escapeHtml(task1 || '—') + '<br>' +
+            'タスク2：' + escapeHtml(task2 || '—') + '<br>' +
+            'Leader＆Other：' + escapeHtml(leaderOther || '—') +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    // --- 割り当て取り消し ---
+    async function cancelAssignment(id) {
+      if (!confirm('この割り当てを取り消しますか？累積回数も元に戻ります。')) return;
+      try {
+        await apiFetch('/api/assignments/' + id + '/cancel', { method: 'PUT' });
+        showNotification('割り当てを取り消しました', 'success');
+        await loadMembers();
+        await loadHistory();
+      } catch (err) {
+        showNotification('取り消しに失敗しました: ' + err.message, 'error');
+      }
+    }
+
+    // --- ユーティリティ ---
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function formatDateSlash(dateStr) {
+      // YYYY-MM-DD → YYYY/MM/DD
+      if (dateStr && dateStr.includes('-')) {
+        return dateStr.replace(/-/g, '/');
+      }
+      return dateStr;
+    }
+
+    // --- 初期化 ---
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadMembers();
+      await loadHistory();
+    });
+  </script>
+</body>
+</html>
