@@ -235,7 +235,7 @@ function resetAllCounts() {
  * @returns {Array<{id: number, date: string, cancelled: boolean, details: Array<{alias: string, task: string}>}>}
  */
 function getAssignments() {
-  const assignments = db.prepare('SELECT id, date, cancelled, created_at FROM assignments ORDER BY created_at DESC').all();
+  const assignments = db.prepare('SELECT id, date, cancelled, created_at FROM assignments ORDER BY created_at ASC').all();
 
   const getDetails = db.prepare(`
     SELECT m.alias, ad.task
