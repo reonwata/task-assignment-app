@@ -32,7 +32,22 @@ if (seedAssignments.length === 0) {
       task2: ['koniryo', 'riikaa', 'nyunn', 'yamshoic', 'kitetsu'],
       leader_other: ['yonghyun', 'cseungj', 'wyamash', 'yamkohe', 'isswada']
     });
-    console.log('初期データ（3/3, 3/4）を投入しました');
+    saveAssignment('2026-03-05', {
+      task1: ['cseungj', 'isswada', 'curakawa', 'nyunn', 'yamshoic', 'kitetsu'],
+      task2: ['daikikk', 'sagawa', 'mizoyuka', 'yamkohe', 'yonghyun'],
+      leader_other: ['sawmadok', 'riikaa', 'reonwata']
+    });
+    saveAssignment('2026-03-06', {
+      task1: ['isswada', 'curakawa', 'sawmadok'],
+      task2: ['yuukaigt', 'reonwata', 'cseungj'],
+      leader_other: ['daikikk', 'sagawa', 'mizoyuka', 'kitetsu']
+    });
+    saveAssignment('2026-03-07', {
+      task1: ['koniryo', 'sagawa', 'reonwata', 'cseungj'],
+      task2: ['nozayuka', 'uekeisu', 'ayakura', 'isswada', 'sawmadok'],
+      leader_other: ['sakagyun', 'takumr', 'ryoanz', 'curakawa', 'yuukaigt']
+    });
+    console.log('初期データ（3/3〜3/7）を投入しました');
   } catch (err) {
     console.log('初期データ投入スキップ:', err.message);
   }

@@ -125,7 +125,7 @@
   <!-- セクション6: 割り当て履歴エリア -->
   <section>
     <details>
-      <summary style="cursor:pointer;font-size:1.1rem;font-weight:600;color:#34495e;padding:4px 0;">▶ 割り当て履歴</summary>
+      <summary style="cursor:pointer;font-size:1.1rem;font-weight:600;color:#34495e;padding:4px 0;"><span class="toggle-arrow">▶</span> 割り当て履歴</summary>
       <div style="margin-top:12px;" id="history-list"></div>
     </details>
   </section>
@@ -133,13 +133,13 @@
   <script>
     // --- 状態管理 ---
     let members = [];
-    let lastAssignment = null; // { date, task1, task2, leader_other }
+    let lastAssignment = null;
 
     // --- 通知 ---
     function showNotification(message, type) {
       const el = document.getElementById('notification');
       el.textContent = message;
-      el.className = type; // 'success' or 'error'
+      el.className = type;
       clearTimeout(el._timer);
       el._timer = setTimeout(() => { el.className = ''; el.style.display = 'none'; }, 3000);
     }
@@ -176,18 +176,6 @@
       ).join('');
     }
 
-    function renderCountsTable() {
-      const tbody = document.getElementById('counts-body');
-      tbody.innerHTML = members.map(m =>
-        '<tr>' +
-          '<td>' + escapeHtml(m.alias) + '</td>' +
-          '<td><input type="number" min="0" value="' + m.task1_count + '" data-id="' + m.id + '" data-task="task1" onchange="updateCount(this)" onblur="updateCount(this)"></td>' +
-          '<td><input type="number" min="0" value="' + m.task2_count + '" data-id="' + m.id + '" data-task="task2" onchange="updateCount(this)" onblur="updateCount(this)"></td>' +
-          '<td><input type="number" min="0" value="' + m.leader_other_count + '" data-id="' + m.id + '" data-task="leader_other" onchange="updateCount(this)" onblur="updateCount(this)"></td>' +
-        '</tr>'
-      ).join('');
-    }
-
     function renderMemberManageList() {
       const container = document.getElementById('member-manage-list');
       container.innerHTML = members.map(m =>
@@ -200,7 +188,6 @@
     function selectAll() {
       document.querySelectorAll('#member-checkboxes input[type="checkbox"]').forEach(cb => cb.checked = true);
     }
-
     function deselectAll() {
       document.querySelectorAll('#member-checkboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
     }
@@ -242,7 +229,7 @@
       ];
       area.textContent = lines.join('\n');
     }
-
+    function atNames(names) { return names.map(function(n) { return '@' + n; }).join(' '); }
     // --- コピー ---
     async function copyResult() {
       if (!lastAssignment) {
@@ -353,10 +340,17 @@
         const task1 = a.details.filter(d => d.task === 'task1').map(d => d.alias).join('、');
         const task2 = a.details.filter(d => d.task === 'task2').map(d => d.alias).join('、');
         const leaderOther = a.details.filter(d => d.task === 'leader_other').map(d => d.alias).join('、');
+        var buttons = '';
+        if (cancelled) {
+          buttons = '<button class="btn-secondary btn-small" onclick="deleteAssignment(' + a.id + ')" style="margin-right:4px;">削除</button>' +
+            '<button class="btn-danger btn-small" disabled>取り消し</button>';
+        } else {
+          buttons = '<button class="btn-danger btn-small" onclick="cancelAssignment(' + a.id + ')">取り消し</button>';
+        }
         return '<div class="history-item' + (cancelled ? ' cancelled' : '') + '">' +
           '<div class="history-header">' +
             '<span class="history-date">' + escapeHtml(dateStr) + (cancelled ? ' <span class="cancelled-badge">取り消し済み</span>' : '') + '</span>' +
-            '<button class="btn-danger btn-small" onclick="cancelAssignment(' + a.id + ')"' + (cancelled ? ' disabled' : '') + '>取り消し</button>' +
+            '<div>' + buttons + '</div>' +
           '</div>' +
           '<div class="history-details">' +
             'タスク1：' + escapeHtml(task1 || '—') + '<br>' +
@@ -380,6 +374,18 @@
       }
     }
 
+    // --- 割り当て履歴削除 ---
+    async function deleteAssignment(id) {
+      if (!confirm('この履歴を完全に削除しますか？元に戻せません。')) return;
+      try {
+        await apiFetch('/api/assignments/' + id, { method: 'DELETE' });
+        showNotification('履歴を削除しました', 'success');
+        await loadHistory();
+      } catch (err) {
+        showNotification('削除に失敗しました: ' + err.message, 'error');
+      }
+    }
+
     // --- ユーティリティ ---
     function escapeHtml(str) {
       const div = document.createElement('div');
@@ -388,7 +394,6 @@
     }
 
     function formatDateSlash(dateStr) {
-      // YYYY-MM-DD → YYYY/MM/DD
       if (dateStr && dateStr.includes('-')) {
         return dateStr.replace(/-/g, '/');
       }
