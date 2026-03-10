@@ -1,9 +1,9 @@
 /**
- * データベースモジュール
- * SQLiteデータベースの初期化と全データ操作を提供する
+ * データベースモジュール（Turso / libSQL対応）
+ * クラウドSQLiteデータベースの初期化と全データ操作を提供する
  */
 
-const Database = require('better-sqlite3');
+const { createClient } = require('@libsql/client');
 
 const VALID_TASKS = ['task1', 'task2', 'leader_other'];
 
@@ -19,15 +19,15 @@ let db;
 
 /**
  * データベースを初期化する
- * @param {string} [dbPath='task-assignment.db'] - データベースファイルのパス
- * @returns {object} better-sqlite3 データベースインスタンス
+ * @returns {object} libSQL クライアントインスタンス
  */
-function initializeDatabase(dbPath = 'task-assignment.db') {
-  db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
+async function initializeDatabase() {
+  db = createClient({
+    url: process.env.TURSO_DATABASE_URL || 'file:task-assignment.db',
+    authToken: process.env.TURSO_AUTH_TOKEN || undefined
+  });
 
-  db.exec(`
+  await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS members (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       alias TEXT NOT NULL UNIQUE,
@@ -54,15 +54,11 @@ function initializeDatabase(dbPath = 'task-assignment.db') {
   `);
 
   // 初期メンバーが未登録の場合のみ投入
-  const count = db.prepare('SELECT COUNT(*) as count FROM members').get();
-  if (count.count === 0) {
-    const insert = db.prepare('INSERT INTO members (alias) VALUES (?)');
-    const insertMany = db.transaction((members) => {
-      for (const alias of members) {
-        insert.run(alias);
-      }
-    });
-    insertMany(INITIAL_MEMBERS);
+  const count = await db.execute('SELECT COUNT(*) as count FROM members');
+  if (count.rows[0].count === 0) {
+    for (const alias of INITIAL_MEMBERS) {
+      await db.execute({ sql: 'INSERT INTO members (alias) VALUES (?)', args: [alias] });
+    }
   }
 
   return db;
@@ -70,7 +66,6 @@ function initializeDatabase(dbPath = 'task-assignment.db') {
 
 /**
  * 現在のDBインスタンスを取得する（テスト用）
- * @returns {object} better-sqlite3 データベースインスタンス
  */
 function getDb() {
   return db;
@@ -78,222 +73,173 @@ function getDb() {
 
 /**
  * メンバー一覧と累積回数を取得する
- * @returns {Array<{id: number, alias: string, task1_count: number, task2_count: number, leader_other_count: number}>}
  */
-function getMembers() {
-  return db.prepare('SELECT id, alias, task1_count, task2_count, leader_other_count FROM members ORDER BY id').all();
+async function getMembers() {
+  const result = await db.execute('SELECT id, alias, task1_count, task2_count, leader_other_count FROM members ORDER BY id');
+  return result.rows;
 }
 
 /**
  * 特定メンバーを取得する
- * @param {number} id - メンバーID
- * @returns {{id: number, alias: string, task1_count: number, task2_count: number, leader_other_count: number}}
  */
-function getMemberById(id) {
-  const member = db.prepare('SELECT id, alias, task1_count, task2_count, leader_other_count FROM members WHERE id = ?').get(id);
-  if (!member) {
+async function getMemberById(id) {
+  const result = await db.execute({ sql: 'SELECT id, alias, task1_count, task2_count, leader_other_count FROM members WHERE id = ?', args: [id] });
+  if (result.rows.length === 0) {
     throw new Error('メンバーが見つかりません');
   }
-  return member;
+  return result.rows[0];
 }
 
 /**
  * メンバーを追加する
- * @param {string} alias - エイリアス名
- * @returns {{id: number, alias: string, task1_count: number, task2_count: number, leader_other_count: number}}
  */
-function addMember(alias) {
+async function addMember(alias) {
   if (!alias || typeof alias !== 'string' || alias.trim().length === 0) {
     throw new Error('エイリアス名は必須です');
   }
   const trimmed = alias.trim();
-  try {
-    const result = db.prepare('INSERT INTO members (alias) VALUES (?)').run(trimmed);
-    return getMemberById(result.lastInsertRowid);
-  } catch (err) {
-    if (err.message.includes('UNIQUE constraint failed')) {
-      throw new Error('このエイリアス名は既に登録されています');
-    }
-    throw err;
+  // 重複チェック
+  const existing = await db.execute({ sql: 'SELECT id FROM members WHERE alias = ?', args: [trimmed] });
+  if (existing.rows.length > 0) {
+    throw new Error('このエイリアス名は既に登録されています');
   }
+  const result = await db.execute({ sql: 'INSERT INTO members (alias) VALUES (?)', args: [trimmed] });
+  return getMemberById(Number(result.lastInsertRowid));
 }
 
 /**
  * メンバーを削除する
- * @param {number} id - メンバーID
  */
-function deleteMember(id) {
-  // 存在チェック
-  getMemberById(id);
-  db.prepare('DELETE FROM members WHERE id = ?').run(id);
+async function deleteMember(id) {
+  await getMemberById(id);
+  await db.execute({ sql: 'DELETE FROM members WHERE id = ?', args: [id] });
 }
 
 /**
  * 累積回数を更新する
- * @param {number} id - メンバーID
- * @param {string} task - タスク名 ('task1', 'task2', 'leader_other')
- * @param {number} count - 新しい累積回数（非負整数）
- * @returns {{id: number, alias: string, task1_count: number, task2_count: number, leader_other_count: number}}
  */
-function updateTaskCount(id, task, count) {
+async function updateTaskCount(id, task, count) {
   if (!VALID_TASKS.includes(task)) {
     throw new Error('無効なタスク名です');
   }
   if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) {
     throw new Error('累積回数は非負整数である必要があります');
   }
-  // 存在チェック
-  getMemberById(id);
+  await getMemberById(id);
   const column = task + '_count';
-  db.prepare(`UPDATE members SET ${column} = ? WHERE id = ?`).run(count, id);
+  await db.execute({ sql: `UPDATE members SET ${column} = ? WHERE id = ?`, args: [count, id] });
   return getMemberById(id);
 }
 
 /**
- * 割り当て履歴を保存し、累積回数を一括増加する（トランザクション）
- * @param {string} date - 割り当て日（YYYY-MM-DD形式）
- * @param {{task1: string[], task2: string[], leader_other: string[]}} assignments - 割り当て結果
- * @returns {{id: number, date: string, cancelled: boolean, details: Array<{alias: string, task: string}>}}
+ * 割り当て履歴を保存し、累積回数を一括増加する
  */
-function saveAssignment(date, assignments) {
-  const saveTransaction = db.transaction(() => {
-    // 割り当てレコード作成
-    const assignResult = db.prepare('INSERT INTO assignments (date) VALUES (?)').run(date);
-    const assignmentId = assignResult.lastInsertRowid;
-
-    const insertDetail = db.prepare('INSERT INTO assignment_details (assignment_id, member_id, task) VALUES (?, ?, ?)');
+async function saveAssignment(date, assignments) {
+  const tx = await db.transaction('write');
+  try {
+    const assignResult = await tx.execute({ sql: 'INSERT INTO assignments (date) VALUES (?)', args: [date] });
+    const assignmentId = Number(assignResult.lastInsertRowid);
     const details = [];
 
     for (const task of VALID_TASKS) {
       const aliases = assignments[task] || [];
       for (const alias of aliases) {
-        const member = db.prepare('SELECT id FROM members WHERE alias = ?').get(alias);
-        if (!member) {
+        const memberResult = await tx.execute({ sql: 'SELECT id FROM members WHERE alias = ?', args: [alias] });
+        if (memberResult.rows.length === 0) {
           throw new Error(`メンバーが見つかりません: ${alias}`);
         }
-        insertDetail.run(assignmentId, member.id, task);
+        const memberId = memberResult.rows[0].id;
+        await tx.execute({ sql: 'INSERT INTO assignment_details (assignment_id, member_id, task) VALUES (?, ?, ?)', args: [assignmentId, memberId, task] });
         details.push({ alias, task });
-
-        // 累積回数を1増加
         const column = task + '_count';
-        db.prepare(`UPDATE members SET ${column} = ${column} + 1 WHERE id = ?`).run(member.id);
+        await tx.execute({ sql: `UPDATE members SET ${column} = ${column} + 1 WHERE id = ?`, args: [memberId] });
       }
     }
 
-    return {
-      id: assignmentId,
-      date,
-      cancelled: false,
-      details
-    };
-  });
-
-  return saveTransaction();
+    await tx.commit();
+    return { id: assignmentId, date, cancelled: false, details };
+  } catch (err) {
+    await tx.rollback();
+    throw err;
+  }
 }
 
 /**
- * 割り当て後の累積回数一括増加（saveAssignmentのエイリアス）
- * @param {string} date - 割り当て日
- * @param {{task1: string[], task2: string[], leader_other: string[]}} assignments - 割り当て結果
- * @returns {{id: number, date: string, cancelled: boolean, details: Array<{alias: string, task: string}>}}
+ * 取り消し時の累積回数一括減少
  */
-function incrementTaskCounts(date, assignments) {
-  return saveAssignment(date, assignments);
-}
-
-/**
- * 取り消し時の累積回数一括減少（トランザクション）
- * @param {number} assignmentId - 割り当てID
- */
-function decrementTaskCounts(assignmentId) {
-  const decrementTransaction = db.transaction(() => {
-    const details = db.prepare(`
-      SELECT ad.member_id, ad.task, m.alias
-      FROM assignment_details ad
-      JOIN members m ON ad.member_id = m.id
-      WHERE ad.assignment_id = ?
-    `).all(assignmentId);
-
-    for (const detail of details) {
-      const column = detail.task + '_count';
-      db.prepare(`UPDATE members SET ${column} = MAX(${column} - 1, 0) WHERE id = ?`).run(detail.member_id);
-    }
+async function decrementTaskCounts(assignmentId) {
+  const details = await db.execute({
+    sql: `SELECT ad.member_id, ad.task, m.alias
+          FROM assignment_details ad
+          JOIN members m ON ad.member_id = m.id
+          WHERE ad.assignment_id = ?`,
+    args: [assignmentId]
   });
-
-  decrementTransaction();
+  for (const detail of details.rows) {
+    const column = detail.task + '_count';
+    await db.execute({ sql: `UPDATE members SET ${column} = MAX(${column} - 1, 0) WHERE id = ?`, args: [detail.member_id] });
+  }
 }
 
 /**
  * 全累積回数をリセットする
  */
-function resetAllCounts() {
-  db.prepare('UPDATE members SET task1_count = 0, task2_count = 0, leader_other_count = 0').run();
+async function resetAllCounts() {
+  await db.execute('UPDATE members SET task1_count = 0, task2_count = 0, leader_other_count = 0');
 }
 
 /**
- * 割り当て履歴を取得する（作成日時の降順）
- * @returns {Array<{id: number, date: string, cancelled: boolean, details: Array<{alias: string, task: string}>}>}
+ * 割り当て履歴を取得する（作成日時の昇順）
  */
-function getAssignments() {
-  const assignments = db.prepare('SELECT id, date, cancelled, created_at FROM assignments ORDER BY created_at ASC').all();
-
-  const getDetails = db.prepare(`
-    SELECT m.alias, ad.task
-    FROM assignment_details ad
-    JOIN members m ON ad.member_id = m.id
-    WHERE ad.assignment_id = ?
-  `);
-
-  return assignments.map(a => ({
-    id: a.id,
-    date: a.date,
-    cancelled: a.cancelled === 1,
-    details: getDetails.all(a.id)
-  }));
+async function getAssignments() {
+  const assignments = await db.execute('SELECT id, date, cancelled, created_at FROM assignments ORDER BY created_at ASC');
+  const result = [];
+  for (const a of assignments.rows) {
+    const details = await db.execute({
+      sql: `SELECT m.alias, ad.task
+            FROM assignment_details ad
+            JOIN members m ON ad.member_id = m.id
+            WHERE ad.assignment_id = ?`,
+      args: [a.id]
+    });
+    result.push({
+      id: a.id,
+      date: a.date,
+      cancelled: a.cancelled === 1,
+      details: details.rows
+    });
+  }
+  return result;
 }
 
 /**
- * 割り当てを取り消す（トランザクション）
- * @param {number} id - 割り当てID
+ * 割り当てを取り消す
  */
-function cancelAssignment(id) {
-  const cancelTransaction = db.transaction(() => {
-    const assignment = db.prepare('SELECT id, cancelled FROM assignments WHERE id = ?').get(id);
-    if (!assignment) {
-      throw new Error('割り当てが見つかりません');
-    }
-    if (assignment.cancelled === 1) {
-      throw new Error('この割り当ては既に取り消し済みです');
-    }
-
-    // 累積回数を減少
-    decrementTaskCounts(id);
-
-    // 取り消し済みにマーク
-    db.prepare('UPDATE assignments SET cancelled = 1 WHERE id = ?').run(id);
-  });
-
-  cancelTransaction();
+async function cancelAssignment(id) {
+  const result = await db.execute({ sql: 'SELECT id, cancelled FROM assignments WHERE id = ?', args: [id] });
+  if (result.rows.length === 0) {
+    throw new Error('割り当てが見つかりません');
+  }
+  if (result.rows[0].cancelled === 1) {
+    throw new Error('この割り当ては既に取り消し済みです');
+  }
+  await decrementTaskCounts(id);
+  await db.execute({ sql: 'UPDATE assignments SET cancelled = 1 WHERE id = ?', args: [id] });
 }
 
 /**
  * 割り当て履歴を削除する（取り消し済みのみ削除可能）
- * @param {number} id - 割り当てID
  */
-function deleteAssignment(id) {
-  const deleteTransaction = db.transaction(() => {
-    const assignment = db.prepare('SELECT id, cancelled FROM assignments WHERE id = ?').get(id);
-    if (!assignment) {
-      throw new Error('割り当てが見つかりません');
-    }
-    if (assignment.cancelled !== 1) {
-      throw new Error('取り消し済みの割り当てのみ削除できます');
-    }
-    db.prepare('DELETE FROM assignment_details WHERE assignment_id = ?').run(id);
-    db.prepare('DELETE FROM assignments WHERE id = ?').run(id);
-  });
-
-  deleteTransaction();
+async function deleteAssignment(id) {
+  const result = await db.execute({ sql: 'SELECT id, cancelled FROM assignments WHERE id = ?', args: [id] });
+  if (result.rows.length === 0) {
+    throw new Error('割り当てが見つかりません');
+  }
+  if (result.rows[0].cancelled !== 1) {
+    throw new Error('取り消し済みの割り当てのみ削除できます');
+  }
+  await db.execute({ sql: 'DELETE FROM assignment_details WHERE assignment_id = ?', args: [id] });
+  await db.execute({ sql: 'DELETE FROM assignments WHERE id = ?', args: [id] });
 }
 
 module.exports = {
@@ -304,7 +250,6 @@ module.exports = {
   addMember,
   deleteMember,
   updateTaskCount,
-  incrementTaskCounts,
   decrementTaskCounts,
   resetAllCounts,
   saveAssignment,

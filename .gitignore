@@ -2,3 +2,5 @@ node_modules/
 task-assignment.db
 task-assignment.db-shm
 task-assignment.db-wal
+.wrangler/
+.dev.vars

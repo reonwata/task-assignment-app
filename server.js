@@ -15,50 +15,12 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// データベース初期化
-initializeDatabase();
-
-// 初期データ投入（履歴が空の場合のみ）
-const seedAssignments = getAssignments();
-if (seedAssignments.length === 0) {
-  try {
-    saveAssignment('2026-03-03', {
-      task1: ['uekeisu', 'kitetsu', 'sakagyun', 'yamshoic', 'yamkohe', 'yuukaigt'],
-      task2: ['koniryo', 'riikaa', 'nyunn', 'ryoanz', 'curakawa'],
-      leader_other: ['isswada', 'yonghyun', 'cseungj', 'wyamash', 'ayakura']
-    });
-    saveAssignment('2026-03-04', {
-      task1: ['sawmadok', 'daikikk', 'sagawa', 'yosmi', 'reonwata'],
-      task2: ['koniryo', 'riikaa', 'nyunn', 'yamshoic', 'kitetsu'],
-      leader_other: ['yonghyun', 'cseungj', 'wyamash', 'yamkohe', 'isswada']
-    });
-    saveAssignment('2026-03-05', {
-      task1: ['cseungj', 'isswada', 'curakawa', 'nyunn', 'yamshoic', 'kitetsu'],
-      task2: ['daikikk', 'sagawa', 'mizoyuka', 'yamkohe', 'yonghyun'],
-      leader_other: ['sawmadok', 'riikaa', 'reonwata']
-    });
-    saveAssignment('2026-03-06', {
-      task1: ['isswada', 'curakawa', 'sawmadok'],
-      task2: ['yuukaigt', 'reonwata', 'cseungj'],
-      leader_other: ['daikikk', 'sagawa', 'mizoyuka', 'kitetsu']
-    });
-    saveAssignment('2026-03-07', {
-      task1: ['koniryo', 'sagawa', 'reonwata', 'cseungj'],
-      task2: ['nozayuka', 'uekeisu', 'ayakura', 'isswada', 'sawmadok'],
-      leader_other: ['sakagyun', 'takumr', 'ryoanz', 'curakawa', 'yuukaigt']
-    });
-    console.log('初期データ（3/3〜3/7）を投入しました');
-  } catch (err) {
-    console.log('初期データ投入スキップ:', err.message);
-  }
-}
-
 // --- APIエンドポイント ---
 
 // GET /api/members — メンバー一覧取得
-app.get('/api/members', (req, res) => {
+app.get('/api/members', async (req, res) => {
   try {
-    const members = getMembers();
+    const members = await getMembers();
     res.json({ members });
   } catch (err) {
     res.status(500).json({ error: '内部サーバーエラーが発生しました' });
@@ -66,10 +28,10 @@ app.get('/api/members', (req, res) => {
 });
 
 // POST /api/members — メンバー追加
-app.post('/api/members', (req, res) => {
+app.post('/api/members', async (req, res) => {
   try {
     const { alias } = req.body;
-    const member = addMember(alias);
+    const member = await addMember(alias);
     res.json({ member });
   } catch (err) {
     if (err.message === 'エイリアス名は必須です') {
@@ -83,13 +45,13 @@ app.post('/api/members', (req, res) => {
 });
 
 // DELETE /api/members/:id — メンバー削除
-app.delete('/api/members/:id', (req, res) => {
+app.delete('/api/members/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
       return res.status(400).json({ error: '無効なメンバーIDです' });
     }
-    deleteMember(id);
+    await deleteMember(id);
     res.json({ success: true });
   } catch (err) {
     if (err.message === 'メンバーが見つかりません') {
@@ -100,18 +62,25 @@ app.delete('/api/members/:id', (req, res) => {
 });
 
 // POST /api/assign — タスク割り当て実行
-app.post('/api/assign', (req, res) => {
+app.post('/api/assign', async (req, res) => {
   try {
-    const { memberIds } = req.body;
+    const { memberIds, selectedTasks } = req.body;
     if (!Array.isArray(memberIds) || memberIds.length === 0) {
       return res.status(400).json({ error: '出勤メンバーを1名以上選択してください' });
+    }
+    const validTasks = ['task1', 'task2', 'leader_other'];
+    const tasks = Array.isArray(selectedTasks) && selectedTasks.length > 0
+      ? selectedTasks.filter(t => validTasks.includes(t))
+      : validTasks;
+    if (tasks.length === 0) {
+      return res.status(400).json({ error: 'タスクを1つ以上選択してください' });
     }
 
     // 各メンバーのデータを取得
     const members = [];
     for (const id of memberIds) {
       try {
-        const member = getMemberById(id);
+        const member = await getMemberById(id);
         members.push(member);
       } catch (err) {
         return res.status(404).json({ error: `メンバーが見つかりません (ID: ${id})` });
@@ -119,7 +88,7 @@ app.post('/api/assign', (req, res) => {
     }
 
     // 割り当て実行
-    const result = assignTasks(members);
+    const result = assignTasks(members, tasks);
 
     // 今日の日付（YYYY-MM-DD形式、日本時間）
     const now = new Date();
@@ -127,7 +96,7 @@ app.post('/api/assign', (req, res) => {
     const date = `${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, '0')}-${String(jst.getUTCDate()).padStart(2, '0')}`;
 
     // DB保存（累積回数更新 + 履歴保存）
-    const assignment = saveAssignment(date, result);
+    const assignment = await saveAssignment(date, result);
 
     res.json({
       assignment: {
@@ -144,14 +113,14 @@ app.post('/api/assign', (req, res) => {
 });
 
 // PUT /api/members/:id/counts — 累積回数更新
-app.put('/api/members/:id/counts', (req, res) => {
+app.put('/api/members/:id/counts', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
       return res.status(400).json({ error: '無効なメンバーIDです' });
     }
     const { task, count } = req.body;
-    const member = updateTaskCount(id, task, count);
+    const member = await updateTaskCount(id, task, count);
     res.json({ member });
   } catch (err) {
     if (err.message === 'メンバーが見つかりません') {
@@ -165,9 +134,9 @@ app.put('/api/members/:id/counts', (req, res) => {
 });
 
 // POST /api/reset — 累積回数一括リセット
-app.post('/api/reset', (req, res) => {
+app.post('/api/reset', async (req, res) => {
   try {
-    resetAllCounts();
+    await resetAllCounts();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: '内部サーバーエラーが発生しました' });
@@ -175,9 +144,9 @@ app.post('/api/reset', (req, res) => {
 });
 
 // GET /api/assignments — 割り当て履歴取得
-app.get('/api/assignments', (req, res) => {
+app.get('/api/assignments', async (req, res) => {
   try {
-    const assignments = getAssignments();
+    const assignments = await getAssignments();
     res.json({ assignments });
   } catch (err) {
     res.status(500).json({ error: '内部サーバーエラーが発生しました' });
@@ -185,13 +154,13 @@ app.get('/api/assignments', (req, res) => {
 });
 
 // DELETE /api/assignments/:id — 取り消し済み割り当て削除
-app.delete('/api/assignments/:id', (req, res) => {
+app.delete('/api/assignments/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
       return res.status(400).json({ error: '無効な割り当てIDです' });
     }
-    deleteAssignment(id);
+    await deleteAssignment(id);
     res.json({ success: true });
   } catch (err) {
     if (err.message === '割り当てが見つかりません') {
@@ -205,13 +174,13 @@ app.delete('/api/assignments/:id', (req, res) => {
 });
 
 // PUT /api/assignments/:id/cancel — 割り当て取り消し
-app.put('/api/assignments/:id/cancel', (req, res) => {
+app.put('/api/assignments/:id/cancel', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
       return res.status(400).json({ error: '無効な割り当てIDです' });
     }
-    cancelAssignment(id);
+    await cancelAssignment(id);
     res.json({ success: true });
   } catch (err) {
     if (err.message === '割り当てが見つかりません') {
@@ -224,9 +193,68 @@ app.put('/api/assignments/:id/cancel', (req, res) => {
   }
 });
 
-// サーバー起動
-app.listen(PORT, () => {
-  console.log(`タスク割り当てアプリが起動しました: http://localhost:${PORT}`);
+// --- サーバー起動 ---
+async function startServer() {
+  await initializeDatabase();
+
+  // 初期データ投入（履歴が空の場合のみ）
+  const seedAssignments = await getAssignments();
+  if (seedAssignments.length === 0) {
+    try {
+      await saveAssignment('2026-03-03', {
+        task1: ['uekeisu', 'kitetsu', 'sakagyun', 'yamshoic', 'yamkohe', 'yuukaigt'],
+        task2: ['koniryo', 'riikaa', 'nyunn', 'ryoanz', 'curakawa'],
+        leader_other: ['isswada', 'yonghyun', 'cseungj', 'wyamash', 'ayakura']
+      });
+      await saveAssignment('2026-03-04', {
+        task1: ['sawmadok', 'daikikk', 'sagawa', 'yosmi', 'reonwata'],
+        task2: ['koniryo', 'riikaa', 'nyunn', 'yamshoic', 'kitetsu'],
+        leader_other: ['yonghyun', 'cseungj', 'wyamash', 'yamkohe', 'isswada']
+      });
+      await saveAssignment('2026-03-05', {
+        task1: ['cseungj', 'isswada', 'curakawa', 'nyunn', 'yamshoic', 'kitetsu'],
+        task2: ['daikikk', 'sagawa', 'mizoyuka', 'yamkohe', 'yonghyun'],
+        leader_other: ['sawmadok', 'riikaa', 'reonwata']
+      });
+      await saveAssignment('2026-03-06', {
+        task1: ['isswada', 'curakawa', 'sawmadok'],
+        task2: ['yuukaigt', 'reonwata', 'cseungj'],
+        leader_other: ['daikikk', 'sagawa', 'mizoyuka', 'kitetsu']
+      });
+      await saveAssignment('2026-03-07', {
+        task1: ['koniryo', 'sagawa', 'reonwata', 'cseungj'],
+        task2: ['nozayuka', 'uekeisu', 'ayakura', 'isswada', 'sawmadok'],
+        leader_other: ['sakagyun', 'takumr', 'ryoanz', 'curakawa', 'yuukaigt']
+      });
+      await saveAssignment('2026-03-08', {
+        task1: ['ryoanz', 'reonwata'],
+        task2: ['sakagyun', 'takumr', 'wyamash', 'sagawa'],
+        leader_other: ['nozayuka', 'uekeisu', 'koniryo', 'nyunn', 'sawmadok']
+      });
+      await saveAssignment('2026-03-09', {
+        task1: [],
+        task2: ['daikikk', 'takumr', 'ryoanz', 'yamkohe', 'mizoyuka', 'ayakura', 'wyamash'],
+        leader_other: ['yosihatt', 'yamshoic', 'yosmi', 'sakagyun', 'nyunn', 'kitetsu', 'cseungj']
+      });
+      await saveAssignment('2026-03-10', {
+        task1: ['daikikk', 'ryoanz', 'yamkohe', 'cseungj', 'yosmi', 'nyunn', 'wyamash'],
+        task2: [],
+        leader_other: ['mizoyuka', 'kitetsu', 'curakawa', 'yuukaigt', 'sakagyun', 'yamshoic']
+      });
+      console.log('初期データ（3/3〜3/10）を投入しました');
+    } catch (err) {
+      console.log('初期データ投入スキップ:', err.message);
+    }
+  }
+
+  app.listen(PORT, () => {
+    console.log(`タスク割り当てアプリが起動しました: http://localhost:${PORT}`);
+  });
+}
+
+startServer().catch(err => {
+  console.error('サーバー起動エラー:', err);
+  process.exit(1);
 });
 
 module.exports = app;

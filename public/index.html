@@ -74,9 +74,10 @@
     <div style="background:#eaf4fc;border-radius:6px;padding:12px 16px;font-size:0.85rem;line-height:1.7;color:#2c3e50;">
       📋 <span style="font-weight:600;">使い方（毎日代表者1名が行ってください）</span><br>
       ① 下の「出勤メンバー選択」で、本日出勤しているメンバーにチェックを入れる<br>
-      ② 「割り当て実行」ボタンを押す（※タスク回数は均等になるように割り振られます）<br>
-      ③ 割り当て結果が表示されたら「コピー」ボタンを押す<br>
-      ④ Slackのチャンネルに貼り付けて共有する
+      ② 「今日のタスク選択」で、本日割り振るタスクにチェックを入れる（デフォルトは全タスク）<br>
+      ③ 「割り当て実行」ボタンを押す（※タスク回数は均等になるように割り振られます）<br>
+      ④ 割り当て結果が表示されたら「コピー」ボタンを押す<br>
+      ⑤ Slackのチャンネルに貼り付けて共有する
     </div>
   </section>
 
@@ -90,7 +91,17 @@
     <div id="member-checkboxes" class="member-checkboxes"></div>
   </section>
 
-  <!-- セクション2: 割り当て実行ボタン -->
+  <!-- セクション2: タスク選択エリア -->
+  <section>
+    <h2>今日のタスク選択</h2>
+    <div class="member-checkboxes">
+      <label><input type="checkbox" id="task-task1" value="task1" checked> タスク1</label>
+      <label><input type="checkbox" id="task-task2" value="task2" checked> タスク2</label>
+      <label><input type="checkbox" id="task-leader_other" value="leader_other" checked> Leader＆Other</label>
+    </div>
+  </section>
+
+  <!-- セクション3: 割り当て実行ボタン -->
   <section>
     <button id="assign-btn" class="btn-success" onclick="executeAssign()">割り当て実行</button>
   </section>
@@ -202,9 +213,14 @@
           return;
         }
         if (!confirm('選択した' + memberIds.length + '名で割り当てを実行しますか？')) return;
+        const selectedTasks = Array.from(document.querySelectorAll('#task-task1, #task-task2, #task-leader_other')).filter(cb => cb.checked).map(cb => cb.value);
+        if (selectedTasks.length === 0) {
+          showNotification('タスクを1つ以上選択してください', 'error');
+          return;
+        }
         const data = await apiFetch('/api/assign', {
           method: 'POST',
-          body: JSON.stringify({ memberIds })
+          body: JSON.stringify({ memberIds, selectedTasks })
         });
         lastAssignment = data.assignment;
         renderResult(data.assignment);
@@ -216,31 +232,28 @@
       }
     }
 
-    function atNames(names) { return names.map(function(n) { return '@' + n; }).join('、'); }
+    function atNames(names) { return names.map(function(n) { return '@' + n; }).join(' '); }
+
+    function buildResultLines(assignment) {
+      var dateStr = formatDateSlash(assignment.date);
+      var lines = ['■ 本日（' + dateStr + '）のタスク割り振り'];
+      if (assignment.task1 && assignment.task1.length > 0) lines.push('タスク1：' + atNames(assignment.task1));
+      if (assignment.task2 && assignment.task2.length > 0) lines.push('タスク2：' + atNames(assignment.task2));
+      if (assignment.leader_other && assignment.leader_other.length > 0) lines.push('Leader＆Other：' + atNames(assignment.leader_other));
+      return lines;
+    }
 
     function renderResult(assignment) {
-      const area = document.getElementById('result-area');
-      const dateStr = formatDateSlash(assignment.date);
-      const lines = [
-        '■ 本日（' + dateStr + '）のタスク割り振り',
-        'タスク1：' + atNames(assignment.task1),
-        'タスク2：' + atNames(assignment.task2),
-        'Leader＆Other：' + atNames(assignment.leader_other)
-      ];
-      area.textContent = lines.join('\n');
+      var area = document.getElementById('result-area');
+      area.textContent = buildResultLines(assignment).join('\n');
     }
-    function atNames(names) { return names.map(function(n) { return '@' + n; }).join(' '); }
     // --- コピー ---
     async function copyResult() {
       if (!lastAssignment) {
         showNotification('コピーする割り当て結果がありません', 'error');
         return;
       }
-      const dateStr = formatDateSlash(lastAssignment.date);
-      const text = '■ 本日（' + dateStr + '）のタスク割り振り\n' +
-        'タスク1：' + atNames(lastAssignment.task1) + '\n' +
-        'タスク2：' + atNames(lastAssignment.task2) + '\n' +
-        'Leader＆Other：' + atNames(lastAssignment.leader_other);
+      var text = buildResultLines(lastAssignment).join('\n');
       try {
         await navigator.clipboard.writeText(text);
         showNotification('クリップボードにコピーしました', 'success');

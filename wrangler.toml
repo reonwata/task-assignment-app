@@ -1,0 +1,7 @@
+name = "task-assignment-app"
+compatibility_date = "2026-03-10"
+compatibility_flags = ["nodejs_compat"]
+main = "worker.js"
+
+[assets]
+directory = "./public"

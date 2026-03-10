@@ -7,36 +7,34 @@
  * @param {Array<{id: number, alias: string, task1_count: number, task2_count: number, leader_other_count: number}>} members
  * @returns {{task1: string[], task2: string[], leader_other: string[]}}
  */
-function assignTasks(members) {
+function assignTasks(members, selectedTasks) {
   const n = members.length;
-  if (n === 0) {
-    return { task1: [], task2: [], leader_other: [] };
+  const tasks = selectedTasks || ['task1', 'task2', 'leader_other'];
+  const taskCount = tasks.length;
+  const result = { task1: [], task2: [], leader_other: [] };
+  if (n === 0 || taskCount === 0) return result;
+
+  const base = Math.floor(n / taskCount);
+  const remainder = n % taskCount;
+
+  // タスクの優先順位: leader_other → task2 → task1（余りはこの順に+1）
+  const priority = ['leader_other', 'task2', 'task1'].filter(t => tasks.includes(t));
+  const counts = {};
+  let extraIdx = 0;
+  for (const t of priority) {
+    counts[t] = base + (extraIdx < remainder ? 1 : 0);
+    extraIdx++;
   }
 
-  const base = Math.floor(n / 3);
-  const remainder = n % 3;
-
-  const leaderOtherCount = base + (remainder >= 1 ? 1 : 0);
-  const task2Count = base + (remainder >= 2 ? 1 : 0);
-  const task1Count = base;
-
   const remaining = [...members];
-  const result = { task1: [], task2: [], leader_other: [] };
 
-  // Leader&Other — leader_other_count昇順で割り当て
-  remaining.sort((a, b) => a.leader_other_count - b.leader_other_count);
-  const leaderOtherMembers = remaining.splice(0, leaderOtherCount);
-  result.leader_other = leaderOtherMembers.map(m => m.alias);
-
-  // タスク2 — task2_count昇順で割り当て
-  remaining.sort((a, b) => a.task2_count - b.task2_count);
-  const task2Members = remaining.splice(0, task2Count);
-  result.task2 = task2Members.map(m => m.alias);
-
-  // タスク1 — task1_count昇順で割り当て
-  remaining.sort((a, b) => a.task1_count - b.task1_count);
-  const task1Members = remaining.splice(0, task1Count);
-  result.task1 = task1Members.map(m => m.alias);
+  // 優先順位順に割り当て（累積回数が少ない人から）
+  for (const t of priority) {
+    if (counts[t] > 0 && remaining.length > 0) {
+      remaining.sort((a, b) => a[t + '_count'] - b[t + '_count']);
+      result[t] = remaining.splice(0, counts[t]).map(m => m.alias);
+    }
+  }
 
   return result;
 }
