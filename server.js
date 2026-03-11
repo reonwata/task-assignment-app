@@ -241,7 +241,12 @@ async function startServer() {
         task2: [],
         leader_other: ['mizoyuka', 'kitetsu', 'curakawa', 'yuukaigt', 'sakagyun', 'yamshoic']
       });
-      console.log('初期データ（3/3〜3/10）を投入しました');
+      await saveAssignment('2026-03-11', {
+        task1: [],
+        task2: ['nyunn', 'yamshoic', 'wyamash', 'yamkohe', 'yuukaigt'],
+        leader_other: ['mizoyuka', 'kitetsu', 'curakawa', 'reonwata']
+      });
+      console.log('初期データ（3/3〜3/11）を投入しました');
     } catch (err) {
       console.log('初期データ投入スキップ:', err.message);
     }

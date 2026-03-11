@@ -77,6 +77,7 @@ async function seedData() {
     ['2026-03-08', { task1: ['ryoanz','reonwata'], task2: ['sakagyun','takumr','wyamash','sagawa'], leader_other: ['nozayuka','uekeisu','koniryo','nyunn','sawmadok'] }],
     ['2026-03-09', { task1: [], task2: ['daikikk','takumr','ryoanz','yamkohe','mizoyuka','ayakura','wyamash'], leader_other: ['yosihatt','yamshoic','yosmi','sakagyun','nyunn','kitetsu','cseungj'] }],
     ['2026-03-10', { task1: ['daikikk','ryoanz','yamkohe','cseungj','yosmi','nyunn','wyamash'], task2: [], leader_other: ['mizoyuka','kitetsu','curakawa','yuukaigt','sakagyun','yamshoic'] }],
+    ['2026-03-11', { task1: [], task2: ['nyunn','yamshoic','wyamash','yamkohe','yuukaigt'], leader_other: ['mizoyuka','kitetsu','curakawa','reonwata'] }],
   ];
 
   // 各日付ごとに: 1回のassignment INSERT + 1回のbatch(details + counts)
