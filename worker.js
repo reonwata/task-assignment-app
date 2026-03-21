@@ -222,20 +222,48 @@ function assignTasks(members, selectedTasks) {
 
   // タスクの優先順位: leader_other → task2 → task1（余りはこの順に+1）
   const priority = ['leader_other', 'task2', 'task1'].filter(t => tasks.includes(t));
-  const counts = {};
+  const taskSlots = {};
   let extraIdx = 0;
   for (const t of priority) {
-    counts[t] = base + (extraIdx < remainder ? 1 : 0);
+    taskSlots[t] = base + (extraIdx < remainder ? 1 : 0);
     extraIdx++;
   }
 
-  const remaining = [...members];
+  // 各メンバー×各タスクの組み合わせを作り、累積回数が少ない順にソート
+  const assigned = new Set();
+  const candidates = [];
+  for (const m of members) {
+    for (const t of priority) {
+      candidates.push({
+        member: m,
+        task: t,
+        count: m[t + '_count'],
+        rand: Math.random()
+      });
+    }
+  }
+  // 累積回数が少ない順 → 同点ならランダム
+  candidates.sort((a, b) => a.count - b.count || a.rand - b.rand);
 
-  // 優先順位順に割り当て（累積回数が少ない人から）
-  for (const t of priority) {
-    if (counts[t] > 0 && remaining.length > 0) {
-      remaining.sort((a, b) => a[t + '_count'] - b[t + '_count']);
-      result[t] = remaining.splice(0, counts[t]).map(m => m.alias);
+  // 貪欲法で割り当て: 累積回数が少ないタスクに優先配置
+  for (const c of candidates) {
+    if (assigned.has(c.member.id)) continue;
+    if (taskSlots[c.task] <= 0) continue;
+    result[c.task].push(c.member.alias);
+    assigned.add(c.member.id);
+    taskSlots[c.task]--;
+  }
+
+  // 未割り当てメンバーがいたら空きタスクに入れる
+  for (const m of members) {
+    if (assigned.has(m.id)) continue;
+    for (const t of priority) {
+      if (taskSlots[t] > 0) {
+        result[t].push(m.alias);
+        assigned.add(m.id);
+        taskSlots[t]--;
+        break;
+      }
     }
   }
 
