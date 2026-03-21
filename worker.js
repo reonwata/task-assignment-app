@@ -78,6 +78,13 @@ async function seedData() {
     ['2026-03-09', { task1: [], task2: ['daikikk','takumr','ryoanz','yamkohe','mizoyuka','ayakura','wyamash'], leader_other: ['yosihatt','yamshoic','yosmi','sakagyun','nyunn','kitetsu','cseungj'] }],
     ['2026-03-10', { task1: ['daikikk','ryoanz','yamkohe','cseungj','yosmi','nyunn','wyamash'], task2: [], leader_other: ['mizoyuka','kitetsu','curakawa','yuukaigt','sakagyun','yamshoic'] }],
     ['2026-03-11', { task1: [], task2: ['nyunn','yamshoic','wyamash','yamkohe','yuukaigt'], leader_other: ['mizoyuka','kitetsu','curakawa','reonwata'] }],
+    ['2026-03-12', { task1: ['mizoyuka','yuukaigt','curakawa','kitetsu','reonwata','cseungj'], task2: [], leader_other: ['daikikk','takumr','yamkohe','yosmi','ayakura','nyunn','yamshoic'] }],
+    ['2026-03-13', { task1: [], task2: ['sakagyun','cseungj','curakawa','kitetsu','mizoyuka'], leader_other: ['ryoanz','takumr','yosmi','reonwata','ayakura','yuukaigt'] }],
+    ['2026-03-14', { task1: ['takumr','ayakura','yuukaigt','curakawa','reonwata'], task2: [], leader_other: ['yonghyun','ryoanz','wyamash','isswada','sakagyun'] }],
+    ['2026-03-15', { task1: [], task2: ['reonwata','ayakura','sakagyun','wyamash'], leader_other: ['yamkohe','nyunn','yamshoic','takumr','ryoanz'] }],
+    ['2026-03-17', { task1: [], task2: ['yosmi','curakawa','ryoanz','mizoyuka'], leader_other: ['yosihatt','daikikk','yonghyun','wyamash','yamkohe'] }],
+    ['2026-03-20', { task1: ['ayakura','ryoanz','yuukaigt'], task2: [], leader_other: ['daikikk','yosmi','curakawa','reonwata'] }],
+    ['2026-03-21', { task1: ['sakagyun','ayakura','ryoanz','reonwata'], task2: ['sawmadok','cseungj','yuukaigt','takumr'], leader_other: ['nozayuka','uekeisu','riikaa','sagawa'] }],
   ];
 
   // 各日付ごとに: 1回のassignment INSERT + 1回のbatch(details + counts)

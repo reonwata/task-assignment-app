@@ -246,7 +246,42 @@ async function startServer() {
         task2: ['nyunn', 'yamshoic', 'wyamash', 'yamkohe', 'yuukaigt'],
         leader_other: ['mizoyuka', 'kitetsu', 'curakawa', 'reonwata']
       });
-      console.log('初期データ（3/3〜3/11）を投入しました');
+      await saveAssignment('2026-03-12', {
+        task1: ['mizoyuka', 'yuukaigt', 'curakawa', 'kitetsu', 'reonwata', 'cseungj'],
+        task2: [],
+        leader_other: ['daikikk', 'takumr', 'yamkohe', 'yosmi', 'ayakura', 'nyunn', 'yamshoic']
+      });
+      await saveAssignment('2026-03-13', {
+        task1: [],
+        task2: ['sakagyun', 'cseungj', 'curakawa', 'kitetsu', 'mizoyuka'],
+        leader_other: ['ryoanz', 'takumr', 'yosmi', 'reonwata', 'ayakura', 'yuukaigt']
+      });
+      await saveAssignment('2026-03-14', {
+        task1: ['takumr', 'ayakura', 'yuukaigt', 'curakawa', 'reonwata'],
+        task2: [],
+        leader_other: ['yonghyun', 'ryoanz', 'wyamash', 'isswada', 'sakagyun']
+      });
+      await saveAssignment('2026-03-15', {
+        task1: [],
+        task2: ['reonwata', 'ayakura', 'sakagyun', 'wyamash'],
+        leader_other: ['yamkohe', 'nyunn', 'yamshoic', 'takumr', 'ryoanz']
+      });
+      await saveAssignment('2026-03-17', {
+        task1: [],
+        task2: ['yosmi', 'curakawa', 'ryoanz', 'mizoyuka'],
+        leader_other: ['yosihatt', 'daikikk', 'yonghyun', 'wyamash', 'yamkohe']
+      });
+      await saveAssignment('2026-03-20', {
+        task1: ['ayakura', 'ryoanz', 'yuukaigt'],
+        task2: [],
+        leader_other: ['daikikk', 'yosmi', 'curakawa', 'reonwata']
+      });
+      await saveAssignment('2026-03-21', {
+        task1: ['sakagyun', 'ayakura', 'ryoanz', 'reonwata'],
+        task2: ['sawmadok', 'cseungj', 'yuukaigt', 'takumr'],
+        leader_other: ['nozayuka', 'uekeisu', 'riikaa', 'sagawa']
+      });
+      console.log('初期データ（3/3〜3/21）を投入しました');
     } catch (err) {
       console.log('初期データ投入スキップ:', err.message);
     }
