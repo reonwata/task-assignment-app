@@ -95,9 +95,9 @@
   <section>
     <h2>今日のタスク選択</h2>
     <div class="member-checkboxes">
-      <label><input type="checkbox" id="task-task1" value="task1" checked> タスク1</label>
-      <label><input type="checkbox" id="task-task2" value="task2" checked> タスク2</label>
-      <label><input type="checkbox" id="task-leader_other" value="leader_other" checked> Leader＆Other</label>
+      <label><input type="checkbox" id="task-task1" value="task1" checked> SIM</label>
+      <label><input type="checkbox" id="task-task2" value="task2" checked> Case</label>
+      <label><input type="checkbox" id="task-leader_other" value="leader_other" checked> Mail</label>
     </div>
   </section>
 
@@ -237,9 +237,9 @@
     function buildResultLines(assignment) {
       var dateStr = formatDateSlash(assignment.date);
       var lines = ['■ 本日（' + dateStr + '）のタスク割り振り'];
-      if (assignment.task1 && assignment.task1.length > 0) lines.push('タスク1：' + atNames(assignment.task1));
-      if (assignment.task2 && assignment.task2.length > 0) lines.push('タスク2：' + atNames(assignment.task2));
-      if (assignment.leader_other && assignment.leader_other.length > 0) lines.push('Leader＆Other：' + atNames(assignment.leader_other));
+      if (assignment.task1 && assignment.task1.length > 0) lines.push('SIM：' + atNames(assignment.task1));
+      if (assignment.task2 && assignment.task2.length > 0) lines.push('Case：' + atNames(assignment.task2));
+      if (assignment.leader_other && assignment.leader_other.length > 0) lines.push('Mail：' + atNames(assignment.leader_other));
       return lines;
     }
 
@@ -366,9 +366,9 @@
             '<div>' + buttons + '</div>' +
           '</div>' +
           '<div class="history-details">' +
-            'タスク1：' + escapeHtml(task1 || '—') + '<br>' +
-            'タスク2：' + escapeHtml(task2 || '—') + '<br>' +
-            'Leader＆Other：' + escapeHtml(leaderOther || '—') +
+            'SIM：' + escapeHtml(task1 || '—') + '<br>' +
+            'Case：' + escapeHtml(task2 || '—') + '<br>' +
+            'Mail：' + escapeHtml(leaderOther || '—') +
           '</div>' +
         '</div>';
       }).join('');

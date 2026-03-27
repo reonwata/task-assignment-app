@@ -87,9 +87,9 @@ function formatAssignmentText(assignments, date) {
   const at = names => names.map(n => '@' + n).join('、');
   const lines = [
     `■ 本日（${date}）のタスク割り振り`,
-    `タスク1：${at(assignments.task1)}`,
-    `タスク2：${at(assignments.task2)}`,
-    `Leader＆Other：${at(assignments.leader_other)}`
+    `SIM：${at(assignments.task1)}`,
+    `Case：${at(assignments.task2)}`,
+    `Mail：${at(assignments.leader_other)}`
   ];
   return lines.join('\n');
 }
