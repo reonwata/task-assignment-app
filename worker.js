@@ -345,18 +345,4 @@ app.put('/api/assignments/:id/cancel', async (c) => {
   }
 });
 
-// --- 一時エンドポイント: DB再構築（SIM/Case/Mail移行用、移行後に削除） ---
-app.post('/api/rebuild-db', async (c) => {
-  try {
-    await db.executeMultiple(`
-      DROP TABLE IF EXISTS assignment_details;
-      DROP TABLE IF EXISTS assignments;
-      DROP TABLE IF EXISTS members;
-    `);
-    initialized = false;
-    await initializeDatabase(c.env);
-    return c.json({ success: true, message: 'DBを再構築しました（SIM/Case/Mail）' });
-  } catch (err) { return c.json({ error: err.message }, 500); }
-});
-
 export default app;
