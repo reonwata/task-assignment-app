@@ -237,9 +237,9 @@
     function buildResultLines(assignment) {
       var dateStr = formatDateSlash(assignment.date);
       var lines = ['■ 本日（' + dateStr + '）のタスク割り振り'];
-      if (assignment.sim && assignment.sim.length > 0) lines.push('SIM：' + atNames(assignment.sim));
-      if (assignment.case && assignment.case.length > 0) lines.push('Case：' + atNames(assignment.case));
-      if (assignment.mail && assignment.mail.length > 0) lines.push('Mail：' + atNames(assignment.mail));
+      if (assignment.sim && assignment.sim.length > 0) lines.push('', 'SIM： ' + atNames(assignment.sim));
+      if (assignment.case && assignment.case.length > 0) lines.push('', 'Case： ' + atNames(assignment.case));
+      if (assignment.mail && assignment.mail.length > 0) lines.push('', 'Mail： ' + atNames(assignment.mail));
       return lines;
     }
 
