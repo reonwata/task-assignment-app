@@ -87,9 +87,9 @@
       tbody.innerHTML = members.map(m =>
         '<tr>' +
           '<td>' + escapeHtml(m.alias) + '</td>' +
-          '<td><input type="number" min="0" value="' + m.task1_count + '" data-id="' + m.id + '" data-task="task1" onchange="updateCount(this)" onblur="updateCount(this)"></td>' +
-          '<td><input type="number" min="0" value="' + m.task2_count + '" data-id="' + m.id + '" data-task="task2" onchange="updateCount(this)" onblur="updateCount(this)"></td>' +
-          '<td><input type="number" min="0" value="' + m.leader_other_count + '" data-id="' + m.id + '" data-task="leader_other" onchange="updateCount(this)" onblur="updateCount(this)"></td>' +
+          '<td><input type="number" min="0" value="' + m.sim_count + '" data-id="' + m.id + '" data-task="sim" onchange="updateCount(this)" onblur="updateCount(this)"></td>' +
+          '<td><input type="number" min="0" value="' + m.case_count + '" data-id="' + m.id + '" data-task="case" onchange="updateCount(this)" onblur="updateCount(this)"></td>' +
+          '<td><input type="number" min="0" value="' + m.mail_count + '" data-id="' + m.id + '" data-task="mail" onchange="updateCount(this)" onblur="updateCount(this)"></td>' +
         '</tr>'
       ).join('');
     }

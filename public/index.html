@@ -95,9 +95,9 @@
   <section>
     <h2>今日のタスク選択</h2>
     <div class="member-checkboxes">
-      <label><input type="checkbox" id="task-task1" value="task1" checked> SIM</label>
-      <label><input type="checkbox" id="task-task2" value="task2" checked> Case</label>
-      <label><input type="checkbox" id="task-leader_other" value="leader_other" checked> Mail</label>
+      <label><input type="checkbox" id="task-sim" value="sim" checked> SIM</label>
+      <label><input type="checkbox" id="task-case" value="case" checked> Case</label>
+      <label><input type="checkbox" id="task-mail" value="mail" checked> Mail</label>
     </div>
   </section>
 
@@ -213,7 +213,7 @@
           return;
         }
         if (!confirm('選択した' + memberIds.length + '名で割り当てを実行しますか？')) return;
-        const selectedTasks = Array.from(document.querySelectorAll('#task-task1, #task-task2, #task-leader_other')).filter(cb => cb.checked).map(cb => cb.value);
+        const selectedTasks = Array.from(document.querySelectorAll('#task-sim, #task-case, #task-mail')).filter(cb => cb.checked).map(cb => cb.value);
         if (selectedTasks.length === 0) {
           showNotification('タスクを1つ以上選択してください', 'error');
           return;
@@ -237,9 +237,9 @@
     function buildResultLines(assignment) {
       var dateStr = formatDateSlash(assignment.date);
       var lines = ['■ 本日（' + dateStr + '）のタスク割り振り'];
-      if (assignment.task1 && assignment.task1.length > 0) lines.push('SIM：' + atNames(assignment.task1));
-      if (assignment.task2 && assignment.task2.length > 0) lines.push('Case：' + atNames(assignment.task2));
-      if (assignment.leader_other && assignment.leader_other.length > 0) lines.push('Mail：' + atNames(assignment.leader_other));
+      if (assignment.sim && assignment.sim.length > 0) lines.push('SIM：' + atNames(assignment.sim));
+      if (assignment.case && assignment.case.length > 0) lines.push('Case：' + atNames(assignment.case));
+      if (assignment.mail && assignment.mail.length > 0) lines.push('Mail：' + atNames(assignment.mail));
       return lines;
     }
 
@@ -350,9 +350,9 @@
       container.innerHTML = assignments.map(a => {
         const cancelled = a.cancelled;
         const dateStr = formatDateSlash(a.date);
-        const task1 = a.details.filter(d => d.task === 'task1').map(d => d.alias).join('、');
-        const task2 = a.details.filter(d => d.task === 'task2').map(d => d.alias).join('、');
-        const leaderOther = a.details.filter(d => d.task === 'leader_other').map(d => d.alias).join('、');
+        const sim = a.details.filter(d => d.task === 'sim').map(d => d.alias).join('、');
+        const caseTask = a.details.filter(d => d.task === 'case').map(d => d.alias).join('、');
+        const mail = a.details.filter(d => d.task === 'mail').map(d => d.alias).join('、');
         var buttons = '';
         if (cancelled) {
           buttons = '<button class="btn-secondary btn-small" onclick="deleteAssignment(' + a.id + ')" style="margin-right:4px;">削除</button>' +
@@ -366,9 +366,9 @@
             '<div>' + buttons + '</div>' +
           '</div>' +
           '<div class="history-details">' +
-            'SIM：' + escapeHtml(task1 || '—') + '<br>' +
-            'Case：' + escapeHtml(task2 || '—') + '<br>' +
-            'Mail：' + escapeHtml(leaderOther || '—') +
+            'SIM：' + escapeHtml(sim || '—') + '<br>' +
+            'Case：' + escapeHtml(caseTask || '—') + '<br>' +
+            'Mail：' + escapeHtml(mail || '—') +
           '</div>' +
         '</div>';
       }).join('');

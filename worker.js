@@ -9,7 +9,7 @@ import { createClient } from '@libsql/client';
 const app = new Hono();
 
 // --- 定数 ---
-const VALID_TASKS = ['task1', 'task2', 'leader_other'];
+const VALID_TASKS = ['sim', 'case', 'mail'];
 const INITIAL_MEMBERS = [
   'nozayuka', 'yosihatt', 'uekeisu', 'koniryo', 'yonghyun',
   'sawmadok', 'riikaa', 'sakagyun', 'nyunn', 'yamshoic',
@@ -31,8 +31,8 @@ async function initializeDatabase(env) {
   await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS members (
       id INTEGER PRIMARY KEY AUTOINCREMENT, alias TEXT NOT NULL UNIQUE,
-      task1_count INTEGER NOT NULL DEFAULT 0, task2_count INTEGER NOT NULL DEFAULT 0,
-      leader_other_count INTEGER NOT NULL DEFAULT 0
+      sim_count INTEGER NOT NULL DEFAULT 0, case_count INTEGER NOT NULL DEFAULT 0,
+      mail_count INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS assignments (
       id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT NOT NULL,
@@ -48,68 +48,21 @@ async function initializeDatabase(env) {
   `);
   const count = await db.execute('SELECT COUNT(*) as count FROM members');
   if (Number(count.rows[0].count) === 0) {
-    // メンバー一括登録（batch）
     await db.batch(
       INITIAL_MEMBERS.map(alias => ({ sql: 'INSERT INTO members (alias) VALUES (?)', args: [alias] })),
       'write'
     );
   }
-  // シードデータは初回リクエストでは投入しない（サブリクエスト制限回避）
-  // /api/reseed エンドポイントで手動投入する
   initialized = true;
   return db;
 }
 
-async function seedData() {
-  // メンバーIDマップを1回のクエリで取得
-  const allMembers = await db.execute('SELECT id, alias FROM members');
-  const memberMap = {};
-  for (const m of allMembers.rows) {
-    memberMap[m.alias] = Number(m.id);
-  }
-
-  const seeds = [
-    ['2026-03-03', { task1: ['uekeisu','kitetsu','sakagyun','yamshoic','yamkohe','yuukaigt'], task2: ['koniryo','riikaa','nyunn','ryoanz','curakawa'], leader_other: ['isswada','yonghyun','cseungj','wyamash','ayakura'] }],
-    ['2026-03-04', { task1: ['sawmadok','daikikk','sagawa','yosmi','reonwata'], task2: ['koniryo','riikaa','nyunn','yamshoic','kitetsu'], leader_other: ['yonghyun','cseungj','wyamash','yamkohe','isswada'] }],
-    ['2026-03-05', { task1: ['cseungj','isswada','curakawa','nyunn','yamshoic','kitetsu'], task2: ['daikikk','sagawa','mizoyuka','yamkohe','yonghyun'], leader_other: ['sawmadok','riikaa','reonwata'] }],
-    ['2026-03-06', { task1: ['isswada','curakawa','sawmadok'], task2: ['yuukaigt','reonwata','cseungj'], leader_other: ['daikikk','sagawa','mizoyuka','kitetsu'] }],
-    ['2026-03-07', { task1: ['koniryo','sagawa','reonwata','cseungj'], task2: ['nozayuka','uekeisu','ayakura','isswada','sawmadok'], leader_other: ['sakagyun','takumr','ryoanz','curakawa','yuukaigt'] }],
-    ['2026-03-08', { task1: ['ryoanz','reonwata'], task2: ['sakagyun','takumr','wyamash','sagawa'], leader_other: ['nozayuka','uekeisu','koniryo','nyunn','sawmadok'] }],
-    ['2026-03-09', { task1: [], task2: ['daikikk','takumr','ryoanz','yamkohe','mizoyuka','ayakura','wyamash'], leader_other: ['yosihatt','yamshoic','yosmi','sakagyun','nyunn','kitetsu','cseungj'] }],
-    ['2026-03-10', { task1: ['daikikk','ryoanz','yamkohe','cseungj','yosmi','nyunn','wyamash'], task2: [], leader_other: ['mizoyuka','kitetsu','curakawa','yuukaigt','sakagyun','yamshoic'] }],
-    ['2026-03-11', { task1: [], task2: ['nyunn','yamshoic','wyamash','yamkohe','yuukaigt'], leader_other: ['mizoyuka','kitetsu','curakawa','reonwata'] }],
-    ['2026-03-12', { task1: ['mizoyuka','yuukaigt','curakawa','kitetsu','reonwata','cseungj'], task2: [], leader_other: ['daikikk','takumr','yamkohe','yosmi','ayakura','nyunn','yamshoic'] }],
-    ['2026-03-13', { task1: [], task2: ['sakagyun','cseungj','curakawa','kitetsu','mizoyuka'], leader_other: ['ryoanz','takumr','yosmi','reonwata','ayakura','yuukaigt'] }],
-    ['2026-03-14', { task1: ['takumr','ayakura','yuukaigt','curakawa','reonwata'], task2: [], leader_other: ['yonghyun','ryoanz','wyamash','isswada','sakagyun'] }],
-    ['2026-03-15', { task1: [], task2: ['reonwata','ayakura','sakagyun','wyamash'], leader_other: ['yamkohe','nyunn','yamshoic','takumr','ryoanz'] }],
-    ['2026-03-17', { task1: [], task2: ['yosmi','curakawa','ryoanz','mizoyuka'], leader_other: ['yosihatt','daikikk','yonghyun','wyamash','yamkohe'] }],
-    ['2026-03-20', { task1: ['ayakura','ryoanz','yuukaigt'], task2: [], leader_other: ['daikikk','yosmi','curakawa','reonwata'] }],
-    ['2026-03-21', { task1: ['sakagyun','ayakura','ryoanz','reonwata'], task2: ['sawmadok','cseungj','yuukaigt','takumr'], leader_other: ['nozayuka','uekeisu','riikaa','sagawa'] }],
-  ];
-
-  // 各日付ごとに: 1回のassignment INSERT + 1回のbatch(details + counts)
-  for (const [date, data] of seeds) {
-    const ar = await db.execute({ sql: 'INSERT INTO assignments (date) VALUES (?)', args: [date] });
-    const assignmentId = Number(ar.lastInsertRowid);
-    const stmts = [];
-    for (const task of VALID_TASKS) {
-      for (const alias of (data[task] || [])) {
-        const memberId = memberMap[alias];
-        if (!memberId) throw new Error(`メンバーが見つかりません: ${alias}`);
-        stmts.push({ sql: 'INSERT INTO assignment_details (assignment_id, member_id, task) VALUES (?, ?, ?)', args: [assignmentId, memberId, task] });
-        stmts.push({ sql: `UPDATE members SET ${task}_count = ${task}_count + 1 WHERE id = ?`, args: [memberId] });
-      }
-    }
-    await db.batch(stmts, 'write');
-  }
-}
-
 // --- DB操作関数 ---
 async function getMembers() {
-  return (await db.execute('SELECT id, alias, task1_count, task2_count, leader_other_count FROM members ORDER BY id')).rows;
+  return (await db.execute('SELECT id, alias, sim_count, case_count, mail_count FROM members ORDER BY id')).rows;
 }
 async function getMemberById(id) {
-  const r = await db.execute({ sql: 'SELECT id, alias, task1_count, task2_count, leader_other_count FROM members WHERE id = ?', args: [id] });
+  const r = await db.execute({ sql: 'SELECT id, alias, sim_count, case_count, mail_count FROM members WHERE id = ?', args: [id] });
   if (r.rows.length === 0) throw new Error('メンバーが見つかりません');
   return r.rows[0];
 }
@@ -133,17 +86,15 @@ async function updateTaskCount(id, task, count) {
   return getMemberById(id);
 }
 async function resetAllCounts() {
-  await db.execute('UPDATE members SET task1_count = 0, task2_count = 0, leader_other_count = 0');
+  await db.execute('UPDATE members SET sim_count = 0, case_count = 0, mail_count = 0');
 }
 async function saveAssignment(date, assignments) {
-  // 全エイリアスを収集
   const allAliases = [];
   for (const task of VALID_TASKS) {
     for (const alias of (assignments[task] || [])) {
       if (!allAliases.includes(alias)) allAliases.push(alias);
     }
   }
-  // メンバーIDマップを1回のクエリで取得
   const allMembers = await db.execute('SELECT id, alias FROM members');
   const memberMap = {};
   for (const m of allMembers.rows) {
@@ -153,11 +104,9 @@ async function saveAssignment(date, assignments) {
     if (!memberMap[alias]) throw new Error(`メンバーが見つかりません: ${alias}`);
   }
 
-  // assignments挿入
   const ar = await db.execute({ sql: 'INSERT INTO assignments (date) VALUES (?)', args: [date] });
   const assignmentId = Number(ar.lastInsertRowid);
 
-  // details挿入 + カウント更新をbatchで実行
   const stmts = [];
   const details = [];
   for (const task of VALID_TASKS) {
@@ -178,9 +127,7 @@ async function saveAssignment(date, assignments) {
 async function getAssignments() {
   const rows = (await db.execute('SELECT id, date, cancelled, created_at FROM assignments ORDER BY created_at ASC')).rows;
   if (rows.length === 0) return [];
-  // 全detailsを1回のクエリで取得
   const allDetails = (await db.execute('SELECT ad.assignment_id, m.alias, ad.task FROM assignment_details ad JOIN members m ON ad.member_id = m.id')).rows;
-  // assignment_idごとにグループ化
   const detailMap = {};
   for (const d of allDetails) {
     const aid = Number(d.assignment_id);
@@ -219,16 +166,16 @@ async function deleteAssignment(id) {
 // --- 割り当てアルゴリズム ---
 function assignTasks(members, selectedTasks) {
   const n = members.length;
-  const tasks = selectedTasks || ['task1', 'task2', 'leader_other'];
+  const tasks = selectedTasks || ['sim', 'case', 'mail'];
   const taskCount = tasks.length;
-  const result = { task1: [], task2: [], leader_other: [] };
+  const result = { sim: [], case: [], mail: [] };
   if (n === 0 || taskCount === 0) return result;
 
   const base = Math.floor(n / taskCount);
   const remainder = n % taskCount;
 
-  // タスクの優先順位: leader_other → task2 → task1（余りはこの順に+1）
-  const priority = ['leader_other', 'task2', 'task1'].filter(t => tasks.includes(t));
+  // タスクの優先順位: mail → case → sim（余りはこの順に+1）
+  const priority = ['mail', 'case', 'sim'].filter(t => tasks.includes(t));
   const taskSlots = {};
   let extraIdx = 0;
   for (const t of priority) {
@@ -236,7 +183,6 @@ function assignTasks(members, selectedTasks) {
     extraIdx++;
   }
 
-  // 各メンバー×各タスクの組み合わせを作り、累積回数が少ない順にソート
   const assigned = new Set();
   const candidates = [];
   for (const m of members) {
@@ -249,10 +195,8 @@ function assignTasks(members, selectedTasks) {
       });
     }
   }
-  // 累積回数が少ない順 → 同点ならランダム
   candidates.sort((a, b) => a.count - b.count || a.rand - b.rand);
 
-  // 貪欲法で割り当て: 累積回数が少ないタスクに優先配置
   for (const c of candidates) {
     if (assigned.has(c.member.id)) continue;
     if (taskSlots[c.task] <= 0) continue;
@@ -261,7 +205,6 @@ function assignTasks(members, selectedTasks) {
     taskSlots[c.task]--;
   }
 
-  // 未割り当てメンバーがいたら空きタスクに入れる
   for (const m of members) {
     if (assigned.has(m.id)) continue;
     for (const t of priority) {
@@ -316,12 +259,11 @@ app.post('/api/assign', async (c) => {
   try {
     const { memberIds, selectedTasks } = await c.req.json();
     if (!Array.isArray(memberIds) || memberIds.length === 0) return c.json({ error: '出勤メンバーを1名以上選択してください' }, 400);
-    const validTasks = ['task1', 'task2', 'leader_other'];
+    const validTasks = ['sim', 'case', 'mail'];
     const tasks = Array.isArray(selectedTasks) && selectedTasks.length > 0
       ? selectedTasks.filter(t => validTasks.includes(t))
       : validTasks;
     if (tasks.length === 0) return c.json({ error: 'タスクを1つ以上選択してください' }, 400);
-    // 全メンバーを1回で取得してフィルタ
     const allMembers = await getMembers();
     const memberMap = {};
     for (const m of allMembers) memberMap[Number(m.id)] = m;
@@ -335,7 +277,7 @@ app.post('/api/assign', async (c) => {
     const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
     const date = `${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, '0')}-${String(jst.getUTCDate()).padStart(2, '0')}`;
     const assignment = await saveAssignment(date, result);
-    return c.json({ assignment: { id: assignment.id, date: assignment.date, task1: result.task1, task2: result.task2, leader_other: result.leader_other } });
+    return c.json({ assignment: { id: assignment.id, date: assignment.date, sim: result.sim, case: result.case, mail: result.mail } });
   } catch (err) { return c.json({ error: '内部サーバーエラーが発生しました' }, 500); }
 });
 
@@ -377,18 +319,6 @@ app.get('/api/debug', async (c) => {
   } catch (err) { return c.json({ error: err.message }, 500); }
 });
 
-app.post('/api/reseed', async (c) => {
-  try {
-    await db.batch([
-      { sql: 'DELETE FROM assignment_details', args: [] },
-      { sql: 'DELETE FROM assignments', args: [] },
-      { sql: 'UPDATE members SET task1_count = 0, task2_count = 0, leader_other_count = 0', args: [] }
-    ], 'write');
-    await seedData();
-    return c.json({ success: true, message: '初期データを再投入しました' });
-  } catch (err) { return c.json({ error: err.message }, 500); }
-});
-
 app.delete('/api/assignments/:id', async (c) => {
   try {
     const id = parseInt(c.req.param('id'), 10);
@@ -413,6 +343,20 @@ app.put('/api/assignments/:id/cancel', async (c) => {
     if (err.message === 'この割り当ては既に取り消し済みです') return c.json({ error: err.message }, 400);
     return c.json({ error: '内部サーバーエラーが発生しました' }, 500);
   }
+});
+
+// --- 一時エンドポイント: DB再構築（SIM/Case/Mail移行用、移行後に削除） ---
+app.post('/api/rebuild-db', async (c) => {
+  try {
+    await db.executeMultiple(`
+      DROP TABLE IF EXISTS assignment_details;
+      DROP TABLE IF EXISTS assignments;
+      DROP TABLE IF EXISTS members;
+    `);
+    initialized = false;
+    await initializeDatabase(c.env);
+    return c.json({ success: true, message: 'DBを再構築しました（SIM/Case/Mail）' });
+  } catch (err) { return c.json({ error: err.message }, 500); }
 });
 
 export default app;

@@ -198,11 +198,11 @@ nozayuka, yosihatt, uekeisu, koniryo, yonghyun, sawmadok, riikaa, sakagyun, nyun
 - `saveAssignment` は1 SELECT + 1 INSERT + 1 batch
 - `/api/assign` は全メンバーを1クエリで取得
 
-### デプロイ
-```
-cd C:\work\固定タスク
-npx wrangler deploy
-```
+### デプロイ（自動）
+- GitHub Actionsで自動デプロイ設定済み（.github/workflows/deploy.yml）
+- `git push origin main` するだけでCloudflare Workersに自動デプロイされる
+- GitHub Secrets: `CLOUDFLARE_API_TOKEN`（Cloudflare API Token、workflowスコープ付き）
+- 手動デプロイも可能: `npx wrangler deploy`
 
 ### シードデータ再投入（DB初期化が必要な場合のみ）
 ```
@@ -272,6 +272,8 @@ worker.js と server.js の両方にシードデータを保持。現在8日分:
 | 3/10 | Railway → Cloudflare Workers + Hono + Turso に移行（無料・永続化） |
 | 3/10 | タスク選択機能追加（実行するタスクをチェックボックスで選択可能） |
 | 3/10 | 3/9〜3/10のシードデータ追加 |
+| 3/27 | タスク表示名をSIM/Case/Mailに変更（表示のみ、DB変更なし） |
+| 3/27 | GitHub Actions自動デプロイ設定（git push → 自動wrangler deploy） |
 
 ---
 
@@ -285,7 +287,51 @@ worker.js と server.js の両方にシードデータを保持。現在8日分:
 
 ---
 
-## 15. ユーザー（reonwata）の運用スタイル
+## 15. インフラ制限・料金まとめ（2026年3月時点）
+
+### Cloudflare Workers（無料プラン）
+- Workerの数: 無制限
+- リクエスト: 1日10万リクエスト（静的アセットはカウント外・無制限）
+- CPU時間: 1リクエストあたり10ms
+- デプロイ: 無制限
+- 料金: 無料
+
+### Turso（無料 Starterプラン）
+- DB数: 月間アクティブ3個まで
+- ストレージ: 500MB
+- 行読み取り: 月500万行
+- 行書き込み: 月25万行
+- 10日間アクセスなしでDBがアーカイブ（自動復帰、データは消えない）
+- Point-in-Time Recovery: 過去24時間のみ
+- 料金: 無料
+
+### GitHub（無料プラン）
+- リポジトリ数: 無制限（パブリック・プライベート両方）
+- GitHub Actions: 月2,000分（パブリックリポジトリは無制限）
+- ストレージ: リポジトリあたり推奨5GB以下
+- 料金: 無料
+
+### 今後の新規ツール構築テンプレート
+同じ構成（Cloudflare Workers + Turso + 単一HTML）で新しいツールを作る場合：
+1. GitHubに新リポジトリ作成
+2. wrangler.toml + worker.js + public/ の構成で実装
+3. Turso DBを作成（無料枠3個まで。超える場合は既存DBにテーブル追加）
+4. Cloudflare Workers Secrets に TURSO_DATABASE_URL, TURSO_AUTH_TOKEN を設定
+5. GitHub Secrets に CLOUDFLARE_API_TOKEN を設定（既存トークン再利用可）
+6. .github/workflows/deploy.yml を配置（git push で自動デプロイ）
+
+---
+
+## 16. 今後の予定（タスク割り当てツール）
+
+- タスク名をSIM/Case/Mailに完全移行（DB含む）
+- 既存社員のエイリアスを追加（NHメンバーだけでなくチーム全体）
+- 累積回数リセット（新タスク名での運用開始時）
+- 鯨岡さんとの要件すり合わせ後にブラッシュアップ
+
+---
+
+## 17. ユーザー（reonwata）の運用スタイル
 
 - 開発者ではないため、コマンドライン操作はステップバイステップで案内が必要
 - 作業環境: Windows 10, bash shell, ワークスペース `C:\work\固定タスク`
