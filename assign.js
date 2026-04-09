@@ -76,7 +76,7 @@ function formatAssignmentText(assignments, date) {
     `■ 本日（${date}）のタスク割り振り`,
     `SIM：${at(assignments.sim)}`,
     `Case：${at(assignments.case)}`,
-    `Mail：${at(assignments.mail)}`
+    `Mail&C2C：${at(assignments.mail)}`
   ];
   return lines.join('\n');
 }
