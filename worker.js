@@ -40,6 +40,21 @@ async function initializeDatabase(env) {
       FOREIGN KEY (member_id) REFERENCES members(id)
     );
   `);
+  // 一時的なメンバー一括追加（デプロイ後に削除すること）
+  const NEW_MEMBERS = [
+    'minamikv', 'fyuichos', 'komaharu', 'tatsuksl', 'ohkohei', 'yqinghan',
+    'daiban', 'ikeyuu', 'masuito', 'rikast', 'ggushrin', 'ryotaaa',
+    'nozayuka', 'uekeisu', 'koniryo', 'yonghyun', 'sawmadok', 'riikaa',
+    'sakagyun', 'nyunn', 'yamshoic', 'daikikk', 'cseungj', 'sagawa',
+    'takumr', 'ryoanz', 'wyamash', 'yamkohe', 'yosmi', 'cyuikako',
+    'tamakirb', 'harukiht', 'kkshima', 'furryota'
+  ];
+  for (const alias of NEW_MEMBERS) {
+    const existing = await db.execute({ sql: 'SELECT id FROM members WHERE alias = ?', args: [alias] });
+    if (existing.rows.length === 0) {
+      await db.execute({ sql: 'INSERT INTO members (alias) VALUES (?)', args: [alias] });
+    }
+  }
   initialized = true;
   return db;
 }
