@@ -162,10 +162,9 @@ function assignTasks(members, selectedTasks) {
   const result = { sim: [], case: [], mail: [] };
   if (n === 0 || taskCount === 0) return result;
 
+  // 各タスクのスロット数を計算
   const base = Math.floor(n / taskCount);
   const remainder = n % taskCount;
-
-  // タスクの優先順位: mail → case → sim（余りはこの順に+1）
   const priority = ['mail', 'case', 'sim'].filter(t => tasks.includes(t));
   const taskSlots = {};
   let extraIdx = 0;
@@ -175,37 +174,54 @@ function assignTasks(members, selectedTasks) {
   }
 
   const assigned = new Set();
-  const candidates = [];
-  for (const m of members) {
-    for (const t of priority) {
-      candidates.push({
-        member: m,
-        task: t,
-        count: m[t + '_count'],
-        rand: Math.random()
-      });
-    }
-  }
-  candidates.sort((a, b) => a.count - b.count || a.rand - b.rand);
+  let unassigned = [...members];
 
-  for (const c of candidates) {
-    if (assigned.has(c.member.id)) continue;
-    if (taskSlots[c.task] <= 0) continue;
-    result[c.task].push(c.member.alias);
-    assigned.add(c.member.id);
-    taskSlots[c.task]--;
-  }
-
-  for (const m of members) {
-    if (assigned.has(m.id)) continue;
-    for (const t of priority) {
-      if (taskSlots[t] > 0) {
-        result[t].push(m.alias);
-        assigned.add(m.id);
-        taskSlots[t]--;
-        break;
+  // 各ラウンドで未割り当てメンバー全員の希望を集めて、スロットに割り当てる
+  while (unassigned.length > 0) {
+    // 各メンバーの第1希望を計算（空きスロットの中で自分の回数が最小のタスク）
+    const preferences = [];
+    for (const m of unassigned) {
+      let minCount = Infinity;
+      let bestTask = null;
+      for (const t of priority) {
+        if (taskSlots[t] <= 0) continue;
+        const count = Number(m[t + '_count']);
+        if (count < minCount) {
+          minCount = count;
+          bestTask = t;
+        }
+      }
+      if (bestTask !== null) {
+        preferences.push({ member: m, task: bestTask, count: minCount, rand: Math.random() });
       }
     }
+
+    if (preferences.length === 0) break;
+
+    // タスクごとにグループ化
+    const byTask = {};
+    for (const p of preferences) {
+      if (!byTask[p.task]) byTask[p.task] = [];
+      byTask[p.task].push(p);
+    }
+
+    let anyAssigned = false;
+    for (const t of priority) {
+      if (!byTask[t] || taskSlots[t] <= 0) continue;
+      // そのタスクの回数が少ない順（同数ならランダム）でスロットを埋める
+      byTask[t].sort((a, b) => a.count - b.count || a.rand - b.rand);
+      const slots = taskSlots[t];
+      const toAssign = byTask[t].slice(0, slots);
+      for (const p of toAssign) {
+        result[t].push(p.member.alias);
+        assigned.add(p.member.id);
+        taskSlots[t]--;
+        anyAssigned = true;
+      }
+    }
+
+    if (!anyAssigned) break;
+    unassigned = unassigned.filter(m => !assigned.has(m.id));
   }
 
   return result;
