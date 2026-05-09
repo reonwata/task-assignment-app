@@ -57,9 +57,9 @@
 |--------|------|------|
 | id | INTEGER PK | 自動採番 |
 | alias | TEXT UNIQUE | メンバーのエイリアス名 |
-| task1_count | INTEGER | タスク1の累積回数 |
-| task2_count | INTEGER | タスク2の累積回数 |
-| leader_other_count | INTEGER | Leader&Otherの累積回数 |
+| sim_count | INTEGER | SIMの累積回数 |
+| case_count | INTEGER | Caseの累積回数 |
+| mail_count | INTEGER | Mail&C2Cの累積回数 |
 
 ### assignments テーブル
 | カラム | 型 | 説明 |
@@ -75,31 +75,24 @@
 | id | INTEGER PK | 自動採番 |
 | assignment_id | INTEGER FK | assignments.id |
 | member_id | INTEGER FK | members.id |
-| task | TEXT | タスク名（task1, task2, leader_other） |
+| task | TEXT | タスク名（sim, case, mail） |
 
 ---
 
-## 4. 割り当てアルゴリズム（assign.js / worker.js内）
+## 4. 割り当てアルゴリズム（worker.js内）
 
-### ロジック（3タスク選択時）
-1. 出勤メンバー数 n を3で割り、各タスクの人数を決定
-   - base = floor(n / 3)
-   - 余り1人 → Leader&Otherに+1
-   - 余り2人 → Leader&Otherに+1、タスク2に+1
-   - つまり人数が均等でない場合: Leader&Other ≥ タスク2 ≥ タスク1
-2. Leader&Other → leader_other_count が少ない順に割り当て
-3. タスク2 → 残りメンバーから task2_count が少ない順に割り当て
-4. タスク1 → 残り全員
-
-### タスク選択機能（2タスク / 1タスク選択時）
-- ユーザーが実行するタスクを選択可能（タスク1、タスク2、Leader&Other）
-- 選択されたタスク数で人数を分割
-- 優先順位: leader_other → task2 → task1
-- 選択されなかったタスクは空配列（履歴では「—」表示）
+### ロジック（メンバー視点アルゴリズム）
+1. 出勤メンバー数 n を選択タスク数で割り、各タスクのスロット数を決定
+   - base = floor(n / タスク数)
+   - 余りはMail → Case → SIMの優先順で+1
+2. 各ラウンドで全未割り当てメンバーが「自分の中で一番回数が少ないタスク」を希望
+3. 同じタスクに希望が集中した場合、そのタスクの回数が少ない人を優先（同数ならランダム）
+4. あぶれた人は次のラウンドで残りスロットから再度希望を出す
+5. 全員が割り当てられるまで繰り返す
 
 ### 重要な仕様
-- 割り当ては累積回数に基づく公平性を保証
-- 同じ累積回数の場合、ソートの安定性に依存（完全ランダムではない）
+- 個人の中でSIM/Case/Mailの回数が均等になるよう割り振る
+- 全員の回数が同じ場合（初回など）はランダムと同等の動き
 - 割り当て実行時に累積回数が自動で+1される
 - 取り消し時に累積回数が自動で-1される（0未満にはならない）
 
@@ -170,9 +163,11 @@ Leader＆Other：@nozayuka、@uekeisu、@koniryo、@nyunn、@sawmadok
 
 ---
 
-## 8. 初期メンバー一覧（25名）
+## 8. メンバー一覧（34名、手動管理）
 
-nozayuka, yosihatt, uekeisu, koniryo, yonghyun, sawmadok, riikaa, sakagyun, nyunn, yamshoic, daikikk, cseungj, sagawa, takumr, ryoanz, wyamash, yamkohe, yosmi, isswada, mizoyuka, kitetsu, curakawa, reonwata, ayakura, yuukaigt
+minamikv, fyuichos, komaharu, tatsuksl, ohkohei, yqinghan, daiban, ikeyuu, masuito, rikast, ggushrin, ryotaaa, nozayuka, uekeisu, koniryo, yonghyun, sawmadok, riikaa, sakagyun, nyunn, yamshoic, daikikk, cseungj, sagawa, takumr, ryoanz, wyamash, yamkohe, yosmi, cyuikako, tamakirb, harukiht, kkshima, furryota
+
+※ メンバーの追加・削除はUI上のメンバー管理から手動で行う（コードに初期メンバーリストは持たない）
 
 ---
 
@@ -274,6 +269,10 @@ worker.js と server.js の両方にシードデータを保持。現在8日分:
 | 3/10 | 3/9〜3/10のシードデータ追加 |
 | 3/27 | タスク表示名をSIM/Case/Mailに変更（表示のみ、DB変更なし） |
 | 3/27 | GitHub Actions自動デプロイ設定（git push → 自動wrangler deploy） |
+| 5/10 | メンバー削除時にassignment_detailsも削除するよう修正（外部キー制約エラー回避） |
+| 5/10 | INITIAL_MEMBERSの自動挿入を削除（メンバーは手動管理に変更） |
+| 5/10 | メンバーを34名に入れ替え（チーム全体） |
+| 5/10 | 割り当てアルゴリズムをメンバー視点に変更（個人内でタスク回数が均等になるように） |
 
 ---
 
@@ -324,9 +323,6 @@ worker.js と server.js の両方にシードデータを保持。現在8日分:
 
 ## 16. 今後の予定（タスク割り当てツール）
 
-- タスク名をSIM/Case/Mailに完全移行（DB含む）
-- 既存社員のエイリアスを追加（NHメンバーだけでなくチーム全体）
-- 累積回数リセット（新タスク名での運用開始時）
 - 鯨岡さんとの要件すり合わせ後にブラッシュアップ
 
 ---
@@ -335,7 +331,7 @@ worker.js と server.js の両方にシードデータを保持。現在8日分:
 
 - 開発者ではないため、コマンドライン操作はステップバイステップで案内が必要
 - 作業環境: Windows 10, bash shell, ワークスペース `C:\work\固定タスク`
-- GitHub: reonwata, push時にPATトークンをパスワードとして入力
+- GitHub: reonwata, push時にPATトークンをパスワードとして入力（有効期限: 2026/06/02、期限切れ時は再作成が必要）
 - Cloudflareアカウント: Reonwata@amazon.co.jp, サブドメイン: reonwata.workers.dev
 - UIテキスト・エラーメッセージは全て日本語
 - 絵文字は業務メッセージでは使わない
