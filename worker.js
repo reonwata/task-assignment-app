@@ -76,7 +76,10 @@ async function addMember(alias) {
 }
 async function deleteMember(id) {
   await getMemberById(id);
-  await db.execute({ sql: 'DELETE FROM members WHERE id = ?', args: [id] });
+  await db.batch([
+    { sql: 'DELETE FROM assignment_details WHERE member_id = ?', args: [id] },
+    { sql: 'DELETE FROM members WHERE id = ?', args: [id] }
+  ], 'write');
 }
 async function updateTaskCount(id, task, count) {
   if (!VALID_TASKS.includes(task)) throw new Error('無効なタスク名です');
