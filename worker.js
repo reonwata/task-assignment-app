@@ -10,13 +10,7 @@ const app = new Hono();
 
 // --- 定数 ---
 const VALID_TASKS = ['sim', 'case', 'mail'];
-const INITIAL_MEMBERS = [
-  'nozayuka', 'yosihatt', 'uekeisu', 'koniryo', 'yonghyun',
-  'sawmadok', 'riikaa', 'sakagyun', 'nyunn', 'yamshoic',
-  'daikikk', 'cseungj', 'sagawa', 'takumr', 'ryoanz',
-  'wyamash', 'yamkohe', 'yosmi', 'isswada', 'mizoyuka',
-  'kitetsu', 'curakawa', 'reonwata', 'ayakura', 'yuukaigt'
-];
+
 
 let db;
 let initialized = false;
@@ -46,13 +40,6 @@ async function initializeDatabase(env) {
       FOREIGN KEY (member_id) REFERENCES members(id)
     );
   `);
-  const count = await db.execute('SELECT COUNT(*) as count FROM members');
-  if (Number(count.rows[0].count) === 0) {
-    await db.batch(
-      INITIAL_MEMBERS.map(alias => ({ sql: 'INSERT INTO members (alias) VALUES (?)', args: [alias] })),
-      'write'
-    );
-  }
   initialized = true;
   return db;
 }
