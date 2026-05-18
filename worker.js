@@ -155,6 +155,36 @@ async function deleteAssignment(id) {
 }
 
 // --- 割り当てアルゴリズム ---
+function calculateSlots(n, tasks) {
+  const taskSlots = {};
+  
+  // 全タスクが選択されている場合: 優先順位ベースの配分
+  if (tasks.includes('case') && tasks.includes('sim') && tasks.includes('mail')) {
+    // Mail&C2C: HC7以上なら2名、それ以下は1名
+    const mailSlots = n >= 7 ? 2 : 1;
+    const remaining = n - mailSlots;
+    // 残りをCase > SIMの優先で配分（Caseが1多いか同数）
+    const caseSlots = Math.ceil(remaining / 2);
+    const simSlots = remaining - caseSlots;
+    taskSlots.case = caseSlots;
+    taskSlots.sim = simSlots;
+    taskSlots.mail = mailSlots;
+  } else {
+    // タスクが一部のみ選択されている場合: 選択タスク間で均等配分
+    const taskCount = tasks.length;
+    const base = Math.floor(n / taskCount);
+    const remainder = n % taskCount;
+    const priority = ['case', 'sim', 'mail'].filter(t => tasks.includes(t));
+    let extraIdx = 0;
+    for (const t of priority) {
+      taskSlots[t] = base + (extraIdx < remainder ? 1 : 0);
+      extraIdx++;
+    }
+  }
+  
+  return taskSlots;
+}
+
 function assignTasks(members, selectedTasks) {
   const n = members.length;
   const tasks = selectedTasks || ['sim', 'case', 'mail'];
@@ -163,15 +193,8 @@ function assignTasks(members, selectedTasks) {
   if (n === 0 || taskCount === 0) return result;
 
   // 各タスクのスロット数を計算
-  const base = Math.floor(n / taskCount);
-  const remainder = n % taskCount;
-  const priority = ['mail', 'case', 'sim'].filter(t => tasks.includes(t));
-  const taskSlots = {};
-  let extraIdx = 0;
-  for (const t of priority) {
-    taskSlots[t] = base + (extraIdx < remainder ? 1 : 0);
-    extraIdx++;
-  }
+  const taskSlots = calculateSlots(n, tasks);
+  const priority = ['case', 'sim', 'mail'].filter(t => tasks.includes(t));
 
   const assigned = new Set();
   let unassigned = [...members];
